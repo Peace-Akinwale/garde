@@ -148,7 +148,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
           {/* Metadata */}
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
             {(editing ? editedGuide.duration : guide.duration) && (
@@ -213,18 +213,18 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           {/* Summary */}
           {(editing || guide.summary) && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Summary</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Summary</h3>
               {editing ? (
                 <textarea
                   value={editedGuide.summary}
                   onChange={(e) =>
                     setEditedGuide({ ...editedGuide, summary: e.target.value })
                   }
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
                   rows={3}
                 />
               ) : (
-                <p className="text-gray-700">{guide.summary}</p>
+                <p className="text-gray-700 leading-relaxed">{guide.summary}</p>
               )}
             </div>
           )}
@@ -232,7 +232,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           {/* Ingredients */}
           {guide.ingredients && guide.ingredients.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Ingredients / Materials
                 </h3>
@@ -245,7 +245,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                   </button>
                 )}
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {(editing ? editedGuide.ingredients : guide.ingredients).map(
                   (ingredient, index) => (
                     <li key={index} className="flex items-center gap-2">
@@ -269,7 +269,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                       ) : (
                         <>
                           <span className="text-primary-600">•</span>
-                          <span className="text-gray-700">{ingredient}</span>
+                          <span className="text-gray-700 leading-relaxed">{ingredient}</span>
                         </>
                       )}
                     </li>
@@ -282,7 +282,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           {/* Steps */}
           {guide.steps && guide.steps.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Instructions
                 </h3>
@@ -295,7 +295,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                   </button>
                 )}
               </div>
-              <ol className="space-y-3">
+              <ol className="space-y-4">
                 {(editing ? editedGuide.steps : guide.steps).map((step, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-500 text-white text-sm flex items-center justify-center font-medium">
@@ -317,7 +317,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                         </button>
                       </div>
                     ) : (
-                      <p className="flex-1 text-gray-700">{step}</p>
+                      <p className="flex-1 text-gray-700 leading-relaxed">{step}</p>
                     )}
                   </li>
                 ))}

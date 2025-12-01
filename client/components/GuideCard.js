@@ -73,10 +73,10 @@ export default function GuideCard({ guide, onDeleted }) {
     <>
       <div
         onClick={() => setShowDetail(true)}
-        className={`bg-white rounded-lg border-2 ${cardBorderColor} p-4 cursor-pointer card-hover relative overflow-hidden`}
+        className={`bg-white rounded-lg border-2 ${cardBorderColor} p-5 cursor-pointer card-hover relative overflow-hidden`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-4">
           <div className={`flex items-center gap-2 px-2 py-1 rounded-md ${badgeColor}`}>
             <Icon size={16} />
             <span className="text-xs font-medium uppercase tracking-wide">
@@ -94,19 +94,19 @@ export default function GuideCard({ guide, onDeleted }) {
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
+        <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2 leading-snug">
           {guide.title}
         </h3>
 
         {/* Summary */}
         {guide.summary && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-3 leading-relaxed">
+          <p className="text-sm text-gray-600 mb-4 line-clamp-3 leading-relaxed">
             {guide.summary}
           </p>
         )}
 
         {/* Metadata */}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-4">
           {guide.duration && (
             <div className="flex items-center gap-1">
               <Clock size={14} />
