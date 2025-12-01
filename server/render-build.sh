@@ -1,9 +1,13 @@
 #!/bin/bash
-# Render build script - Installs FFmpeg and dependencies
+# Render build script - Download static FFmpeg binary
 
-echo "Installing FFmpeg..."
-apt-get update
-apt-get install -y ffmpeg
+echo "Downloading FFmpeg static binary..."
+mkdir -p ffmpeg-bin
+cd ffmpeg-bin
+wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar -xf ffmpeg-release-amd64-static.tar.xz --strip-components=1
+chmod +x ffmpeg ffprobe
+cd ..
 
 echo "Installing Node.js dependencies..."
 npm install

@@ -6,6 +6,22 @@ import fsPromises from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { openai, anthropic } from '../index.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure FFmpeg path for production (Render)
+if (process.env.NODE_ENV === 'production') {
+  const ffmpegPath = path.join(__dirname, '..', 'ffmpeg-bin', 'ffmpeg');
+  const ffprobePath = path.join(__dirname, '..', 'ffmpeg-bin', 'ffprobe');
+
+  if (fs.existsSync(ffmpegPath)) {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    ffmpeg.setFfprobePath(ffprobePath);
+    console.log('✓ Using static FFmpeg binary for production');
+  }
+}
 
 /**
  * Download video from URL (TikTok, YouTube, Instagram)

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: garde-api
+    runtime: node
+    plan: free
+    branch: master
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
