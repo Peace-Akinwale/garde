@@ -177,10 +177,13 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
                 Paste the link to the video containing the recipe or guide
               </p>
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                <strong>Best support:</strong> TikTok, Instagram, Facebook, Twitter, and 1000+ platforms
+                <strong>✨ Supported:</strong> TikTok videos & photo carousels, Instagram, Facebook, Twitter, and 1000+ platforms
+              </div>
+              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+                <strong>🎯 New!</strong> AI can now read TikTok photo slides and analyze silent cooking videos visually
               </div>
               <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                <strong>Note:</strong> YouTube URLs may be blocked by bot detection. If YouTube fails, download the video and use "Upload File" instead.
+                <strong>Note:</strong> YouTube URLs may be blocked. If it fails, download the video and use "Upload File" instead.
               </div>
             </div>
           ) : (

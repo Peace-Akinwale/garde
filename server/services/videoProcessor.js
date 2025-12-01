@@ -35,6 +35,136 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 /**
+ * Check if URL is a TikTok photo post (carousel/slideshow)
+ */
+function isTikTokPhotoPost(url) {
+  return url.includes('tiktok.com') && url.includes('/photo/');
+}
+
+/**
+ * Download TikTok photo carousel as images
+ */
+async function downloadTikTokPhotos(url, outputDir) {
+  try {
+    console.log('Downloading TikTok photo carousel:', url);
+
+    // Create images directory
+    const imagesDir = path.join(outputDir, 'images');
+    await fsPromises.mkdir(imagesDir, { recursive: true });
+
+    // Use yt-dlp to download all images from the carousel
+    const command = `"${ytDlpPath}" --write-thumbnail --skip-download -o "${path.join(imagesDir, '%(title)s_%(autonumber)s.%(ext)s')}" "${url}"`;
+
+    console.log('Downloading TikTok photos...');
+    await execPromise(command, { timeout: 120000 });
+
+    // Get all downloaded images
+    const files = await fsPromises.readdir(imagesDir);
+    const imageFiles = files.filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
+
+    if (imageFiles.length === 0) {
+      throw new Error('No images downloaded from TikTok carousel');
+    }
+
+    console.log(`Downloaded ${imageFiles.length} images from TikTok carousel`);
+    return imageFiles.map(f => path.join(imagesDir, f));
+  } catch (error) {
+    console.error('TikTok photo download error:', error);
+    throw new Error(`Failed to download TikTok photos: ${error.message}`);
+  }
+}
+
+/**
+ * Extract frames from video for visual analysis (silent videos)
+ */
+async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
+  try {
+    console.log('Extracting video frames for visual analysis...');
+
+    const framesDir = path.join(outputDir, 'frames');
+    await fsPromises.mkdir(framesDir, { recursive: true });
+
+    return new Promise((resolve, reject) => {
+      ffmpeg(videoPath)
+        .on('end', async () => {
+          const files = await fsPromises.readdir(framesDir);
+          const frameFiles = files.filter(f => f.endsWith('.jpg'));
+          console.log(`Extracted ${frameFiles.length} frames`);
+          resolve(frameFiles.map(f => path.join(framesDir, f)));
+        })
+        .on('error', (err) => reject(new Error(`Frame extraction failed: ${err.message}`)))
+        .screenshots({
+          count: numFrames,
+          folder: framesDir,
+          filename: 'frame-%i.jpg',
+          size: '640x480'
+        });
+    });
+  } catch (error) {
+    console.error('Frame extraction error:', error);
+    throw new Error(`Failed to extract frames: ${error.message}`);
+  }
+}
+
+/**
+ * Analyze images using OpenAI Vision API
+ */
+async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
+  try {
+    console.log(`Analyzing ${imagePaths.length} images with Vision API...`);
+
+    const imageAnalyses = [];
+
+    for (const imagePath of imagePaths) {
+      const imageBuffer = await fsPromises.readFile(imagePath);
+      const base64Image = imageBuffer.toString('base64');
+      const ext = path.extname(imagePath).toLowerCase();
+      const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+
+      const prompt = isPhotoCarousel
+        ? 'This is an image from a recipe or cooking tutorial carousel/slideshow. Please read and extract ALL visible text, ingredients, measurements, and instructions. Be thorough and capture every detail you see.'
+        : 'This is a frame from a cooking video. Describe what cooking action is being performed, what ingredients or tools are visible, and any text on screen. Be specific about the cooking technique.';
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`,
+                  detail: 'high'
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 500
+      });
+
+      imageAnalyses.push(response.choices[0].message.content);
+    }
+
+    // Combine all analyses
+    const combinedText = imageAnalyses.join('\n\n---\n\n');
+    console.log('Vision analysis complete');
+
+    return {
+      text: combinedText,
+      language: 'en', // Vision API returns English descriptions
+      duration: null,
+      source: isPhotoCarousel ? 'photo_carousel' : 'video_frames'
+    };
+  } catch (error) {
+    console.error('Vision API error:', error);
+    throw new Error(`Vision analysis failed: ${error.message}`);
+  }
+}
+
+/**
  * Download video using yt-dlp (works for TikTok, YouTube, Instagram, etc.)
  */
 async function downloadWithYtDlp(url, outputPath) {
@@ -291,23 +421,51 @@ export async function processVideo(videoSource, isFile = false, userId) {
     // Create temp directory
     await fsPromises.mkdir(tempDir, { recursive: true });
 
-    const videoPath = path.join(tempDir, 'video.mp4');
-    const audioPath = path.join(tempDir, 'audio.mp3');
+    let transcription;
+    let contentType = 'video'; // 'video', 'photo_carousel', 'silent_video'
 
-    // Step 1: Get video file
-    if (isFile) {
-      // videoSource is already a file path
-      await fsPromises.copyFile(videoSource, videoPath);
-    } else {
-      // videoSource is a URL
-      await downloadVideo(videoSource, videoPath);
+    // CASE 1: TikTok Photo Carousel (slideshow/images)
+    if (!isFile && isTikTokPhotoPost(videoSource)) {
+      console.log('Detected TikTok photo carousel - using Vision API');
+      contentType = 'photo_carousel';
+
+      const imagePaths = await downloadTikTokPhotos(videoSource, tempDir);
+      transcription = await analyzeImagesWithVision(imagePaths, true);
     }
+    // CASE 2: Regular video (file or URL)
+    else {
+      const videoPath = path.join(tempDir, 'video.mp4');
+      const audioPath = path.join(tempDir, 'audio.mp3');
 
-    // Step 2: Extract audio
-    await extractAudio(videoPath, audioPath);
+      // Step 1: Get video file
+      if (isFile) {
+        await fsPromises.copyFile(videoSource, videoPath);
+      } else {
+        await downloadVideo(videoSource, videoPath);
+      }
 
-    // Step 3: Transcribe audio with Whisper
-    const transcription = await transcribeAudio(audioPath);
+      // Step 2: Extract audio
+      await extractAudio(videoPath, audioPath);
+
+      // Step 3: Transcribe audio with Whisper
+      transcription = await transcribeAudio(audioPath);
+
+      // CASE 2B: Silent or music-only video (no meaningful speech)
+      // If transcription is very short or empty, use Vision API
+      if (!transcription.text || transcription.text.trim().length < 50) {
+        console.log('Minimal or no speech detected - using Vision API for visual analysis');
+        contentType = 'silent_video';
+
+        const framePaths = await extractVideoFrames(videoPath, tempDir);
+        const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
+
+        // Combine with any audio transcription (might be music lyrics or short words)
+        transcription.text = transcription.text
+          ? `Audio: ${transcription.text}\n\nVisual Analysis:\n${visionAnalysis.text}`
+          : visionAnalysis.text;
+        transcription.source = 'vision_and_audio';
+      }
+    }
 
     // Step 4: Extract structured guide with Claude
     const extractedGuide = await extractGuideFromText(transcription.text);
@@ -321,11 +479,13 @@ export async function processVideo(videoSource, isFile = false, userId) {
         text: transcription.text,
         language: transcription.language,
         duration: transcription.duration,
+        source: transcription.source || 'audio',
       },
       guide: extractedGuide,
       metadata: {
         processedAt: new Date().toISOString(),
         source: isFile ? 'upload' : 'url',
+        contentType,
       },
     };
   } catch (error) {
