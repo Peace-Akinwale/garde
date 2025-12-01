@@ -14,6 +14,7 @@ import {
   Users,
   TrendingUp,
   Share2,
+  Video,
 } from 'lucide-react';
 
 const typeIcons = {
@@ -248,21 +249,43 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           </div>
 
           {/* Video Player */}
-          {guide.source_url && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Original Video</h3>
-              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-                <iframe
-                  src={guide.source_url.includes('youtube.com') || guide.source_url.includes('youtu.be')
-                    ? guide.source_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
-                    : guide.source_url}
-                  className="w-full h-full"
-                  allowFullScreen
-                  title="Original video"
-                />
+          {guide.source_url && (() => {
+            const isTikTok = guide.source_url.includes('tiktok.com');
+            const isInstagram = guide.source_url.includes('instagram.com');
+            const isYouTube = guide.source_url.includes('youtube.com') || guide.source_url.includes('youtu.be');
+            const canEmbed = !isTikTok && !isInstagram;
+
+            return (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Original Video</h3>
+                {canEmbed ? (
+                  <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+                    <iframe
+                      src={isYouTube
+                        ? guide.source_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
+                        : guide.source_url}
+                      className="w-full h-full"
+                      allowFullScreen
+                      title="Original video"
+                    />
+                  </div>
+                ) : (
+                  <a
+                    href={guide.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-3 p-6 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg transition shadow-lg"
+                  >
+                    <Video size={24} />
+                    <div className="text-left">
+                      <p className="font-semibold">Watch on {isTikTok ? 'TikTok' : 'Instagram'}</p>
+                      <p className="text-sm text-white/90">Click to open original video</p>
+                    </div>
+                  </a>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Summary */}
           {(editing || guide.summary) && (

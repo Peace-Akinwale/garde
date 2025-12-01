@@ -60,6 +60,22 @@ fs.mkdir(uploadsDir, { recursive: true }).catch(() => {
   // Directory already exists, ignore error
 });
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Garde API',
+    version: '1.0.0',
+    status: 'running',
+    message: 'Backend API for Garde - AI-powered recipe & guide extraction',
+    endpoints: {
+      health: '/health',
+      video: '/api/video/*',
+      guides: '/api/guides/*'
+    },
+    frontend: 'https://garde-tau.vercel.app'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Garde API is running' });
