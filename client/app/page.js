@@ -7,7 +7,7 @@ import GuideCard from '@/components/GuideCard';
 import AddGuideModal from '@/components/AddGuideModal';
 import SearchBar from '@/components/SearchBar';
 import AuthModal from '@/components/AuthModal';
-import { Plus, LogOut, User } from 'lucide-react';
+import { Plus, LogOut, User, Moon, Sun } from 'lucide-react';
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -15,6 +15,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     type: 'all',
@@ -22,6 +23,13 @@ export default function Home() {
   });
 
   useEffect(() => {
+    // Load dark mode preference from localStorage
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    setDarkMode(savedDarkMode);
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark');
+    }
+
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -89,6 +97,18 @@ export default function Home() {
     }
   };
 
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    localStorage.setItem('darkMode', newDarkMode.toString());
+
+    if (newDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
   if (!user) {
     return (
       <AuthModal
@@ -99,9 +119,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-40">
+      <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -117,6 +137,13 @@ export default function Home() {
               >
                 <Plus size={20} />
                 <span className="hidden sm:inline">Add Guide</span>
+              </button>
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
               </button>
               <button
                 onClick={handleLogout}

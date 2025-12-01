@@ -125,9 +125,9 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full my-8 relative">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full my-8 relative">
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 rounded-t-xl p-6 flex items-center justify-between">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-600 rounded-t-xl p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Icon size={28} className="text-primary-600" />
             <div>
@@ -138,7 +138,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                   onChange={(e) =>
                     setEditedGuide({ ...editedGuide, title: e.target.value })
                   }
-                  className="text-2xl font-bold text-gray-900 bg-white border-b-2 border-primary-500 focus:outline-none"
+                  className="text-2xl font-bold text-gray-900 dark:text-white bg-white dark:bg-slate-700 border-b-2 border-primary-500 focus:outline-none"
                 />
               ) : (
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{guide.title}</h2>
@@ -198,7 +198,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                     onChange={(e) =>
                       setEditedGuide({ ...editedGuide, duration: e.target.value })
                     }
-                    className="border-b border-gray-300 bg-white text-gray-900 focus:outline-none focus:border-primary-500"
+                    className="border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500"
                     placeholder="e.g., 30 minutes"
                   />
                 ) : (
@@ -216,7 +216,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                     onChange={(e) =>
                       setEditedGuide({ ...editedGuide, servings: e.target.value })
                     }
-                    className="border-b border-gray-300 bg-white text-gray-900 focus:outline-none focus:border-primary-500"
+                    className="border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500"
                     placeholder="e.g., 4 servings"
                   />
                 ) : (
@@ -233,7 +233,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                     onChange={(e) =>
                       setEditedGuide({ ...editedGuide, difficulty: e.target.value })
                     }
-                    className="border-b border-gray-300 bg-white text-gray-900 focus:outline-none focus:border-primary-500"
+                    className="border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500"
                   >
                     <option value="">Select difficulty</option>
                     <option value="easy">Easy</option>
@@ -250,18 +250,18 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           {/* Summary */}
           {(editing || guide.summary) && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Summary</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Summary</h3>
               {editing ? (
                 <textarea
                   value={editedGuide.summary}
                   onChange={(e) =>
                     setEditedGuide({ ...editedGuide, summary: e.target.value })
                   }
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  className="w-full p-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 dark:text-white bg-white dark:bg-slate-700"
                   rows={3}
                 />
               ) : (
-                <p className="text-gray-700 leading-relaxed">{guide.summary}</p>
+                <p className="text-gray-700 dark:text-gray-100 leading-relaxed">{guide.summary}</p>
               )}
             </div>
           )}
@@ -294,7 +294,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                             onChange={(e) =>
                               handleIngredientChange(index, e.target.value)
                             }
-                            className="flex-1 px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                           />
                           <button
                             onClick={() => removeIngredient(index)}
@@ -305,8 +305,8 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                         </>
                       ) : (
                         <>
-                          <span className="text-primary-600">•</span>
-                          <span className="text-gray-700 dark:text-gray-300 leading-relaxed">{ingredient}</span>
+                          <span className="text-primary-600 dark:text-primary-400">•</span>
+                          <span className="text-gray-700 dark:text-gray-100 leading-relaxed">{ingredient}</span>
                         </>
                       )}
                     </li>
@@ -343,7 +343,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                         <textarea
                           value={step}
                           onChange={(e) => handleStepChange(index, e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                           rows={2}
                         />
                         <button
@@ -354,7 +354,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                         </button>
                       </div>
                     ) : (
-                      <p className="flex-1 text-gray-700 dark:text-gray-300 leading-relaxed">{step}</p>
+                      <p className="flex-1 text-gray-700 dark:text-gray-100 leading-relaxed">{step}</p>
                     )}
                   </li>
                 ))}
