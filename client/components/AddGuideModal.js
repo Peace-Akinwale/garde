@@ -176,6 +176,9 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
               <p className="mt-2 text-xs text-gray-500">
                 Paste the link to the video containing the recipe or guide
               </p>
+              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                <strong>Tip:</strong> TikTok/Instagram URLs often don't work. For best results, use File Upload instead.
+              </div>
             </div>
           ) : (
             <div className="mb-6">
@@ -230,10 +233,10 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           </div>
         </form>
 
-        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-xs text-yellow-800">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-800">
             <strong>Note:</strong> The AI will automatically extract recipes and instructions
-            from the video, including support for Yoruba and other languages.
+            from the video, including support for Yoruba and 98+ languages.
           </p>
         </div>
       </div>

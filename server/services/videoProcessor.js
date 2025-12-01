@@ -53,6 +53,17 @@ export async function downloadVideo(url, outputPath) {
     console.log('Response status:', response.status);
     console.log('Content-Type:', response.headers['content-type']);
 
+    // Check if we got HTML instead of video
+    const contentType = response.headers['content-type'] || '';
+    if (contentType.includes('text/html') || contentType.includes('application/json')) {
+      throw new Error('TikTok/Instagram URLs require direct video links. Please use File Upload instead, or try a different URL format.');
+    }
+
+    // Verify we're getting video content
+    if (!contentType.includes('video') && !contentType.includes('octet-stream')) {
+      console.warn(`Unexpected content type: ${contentType}`);
+    }
+
     const writer = fs.createWriteStream(outputPath);
     response.data.pipe(writer);
 
@@ -73,6 +84,19 @@ export async function downloadVideo(url, outputPath) {
             reject(new Error('Downloaded file is empty'));
             return;
           }
+
+          // Check if file is too small (likely HTML/error page)
+          if (stats.size < 50000) { // Less than 50KB is suspicious for a video
+            console.warn(`Downloaded file is suspiciously small: ${stats.size} bytes`);
+            // Read first few bytes to check if it's HTML
+            const buffer = await fsPromises.readFile(outputPath, { encoding: 'utf8', flag: 'r' });
+            const firstChunk = buffer.substring(0, 500);
+            if (firstChunk.includes('<!DOCTYPE') || firstChunk.includes('<html')) {
+              reject(new Error('TikTok/Instagram blocked the download. Please use File Upload instead.'));
+              return;
+            }
+          }
+
           console.log('File size verified:', stats.size, 'bytes');
           resolve(outputPath);
         } catch (err) {
