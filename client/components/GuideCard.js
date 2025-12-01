@@ -73,7 +73,7 @@ export default function GuideCard({ guide, onDeleted }) {
     <>
       <div
         onClick={() => setShowDetail(true)}
-        className={`bg-white rounded-lg border-2 ${cardBorderColor} p-5 cursor-pointer card-hover relative overflow-hidden`}
+        className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${cardBorderColor} dark:border-gray-700 p-5 cursor-pointer card-hover relative overflow-hidden`}
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -94,13 +94,13 @@ export default function GuideCard({ guide, onDeleted }) {
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2 leading-snug">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 line-clamp-2 leading-snug">
           {guide.title}
         </h3>
 
         {/* Summary */}
         {guide.summary && (
-          <p className="text-sm text-gray-600 mb-4 line-clamp-3 leading-relaxed">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 line-clamp-3 leading-relaxed">
             {guide.summary}
           </p>
         )}
