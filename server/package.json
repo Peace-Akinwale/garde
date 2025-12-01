@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "build": "chmod +x render-build.sh && ./render-build.sh",
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
