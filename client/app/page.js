@@ -18,6 +18,7 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [hasUnseenNotifications, setHasUnseenNotifications] = useState(true);
   const [filters, setFilters] = useState({
     search: '',
     type: 'all',
@@ -31,6 +32,10 @@ export default function Home() {
     if (savedDarkMode) {
       document.documentElement.classList.add('dark');
     }
+
+    // Load notification seen status from localStorage
+    const seenNotifications = localStorage.getItem('seenNotifications') === 'true';
+    setHasUnseenNotifications(!seenNotifications);
 
     checkUser();
 
@@ -111,6 +116,12 @@ export default function Home() {
     }
   };
 
+  const handleOpenNotifications = () => {
+    setShowNotifications(true);
+    setHasUnseenNotifications(false);
+    localStorage.setItem('seenNotifications', 'true');
+  };
+
   if (!user) {
     return (
       <AuthModal
@@ -141,13 +152,15 @@ export default function Home() {
                 <span className="hidden sm:inline">Add Guide</span>
               </button>
               <button
-                onClick={() => setShowNotifications(true)}
+                onClick={handleOpenNotifications}
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition relative"
                 title="What's New"
               >
                 <Bell size={20} />
                 {/* New updates indicator */}
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                {hasUnseenNotifications && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
               </button>
               <button
                 onClick={toggleDarkMode}
