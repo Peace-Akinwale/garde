@@ -80,14 +80,22 @@ export async function downloadVideo(url, outputPath) {
     } catch (ytDlpError) {
       console.log('yt-dlp failed, trying fallback methods:', ytDlpError.message);
 
-      // Fallback: Try ytdl-core for YouTube
+      // Check if it's a YouTube URL
       if (ytdl.validateURL(url)) {
         console.log('Falling back to ytdl-core for YouTube...');
-        return await downloadYouTubeVideo(url, outputPath);
+        try {
+          return await downloadYouTubeVideo(url, outputPath);
+        } catch (youtubeError) {
+          // YouTube bot detection - suggest file upload
+          if (youtubeError.message.includes('bot') || youtubeError.message.includes('Sign in')) {
+            throw new Error('YouTube has blocked automated downloads from this server. Please download the video to your device first, then use the "Upload File" option instead.');
+          }
+          throw youtubeError;
+        }
       }
 
       // If yt-dlp failed and it's not YouTube, throw error
-      throw new Error(`Video download failed. ${ytDlpError.message.includes('yt-dlp') ? 'Please use File Upload instead.' : ytDlpError.message}`);
+      throw new Error(`Video download failed. Please try downloading the video to your device and using the "Upload File" option instead.`);
     }
   } catch (error) {
     console.error('Error downloading video:', error.message);
