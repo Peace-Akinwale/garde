@@ -176,8 +176,8 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
               <p className="mt-2 text-xs text-gray-500">
                 Paste the link to the video containing the recipe or guide
               </p>
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                <strong>Tip:</strong> TikTok/Instagram URLs often don't work. For best results, use File Upload instead.
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                <strong>Supported:</strong> YouTube, TikTok, Instagram, and 1000+ other platforms
               </div>
             </div>
           ) : (

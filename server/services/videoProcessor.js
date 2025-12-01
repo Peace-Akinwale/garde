@@ -7,7 +7,10 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { openai, anthropic } from '../index.js';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execPromise = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -24,89 +27,60 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 /**
+ * Download video using yt-dlp (works for TikTok, YouTube, Instagram, etc.)
+ */
+async function downloadWithYtDlp(url, outputPath) {
+  try {
+    console.log('Using yt-dlp to download:', url);
+
+    // yt-dlp command with options
+    const command = `yt-dlp -f "best[ext=mp4]/best" --no-playlist --quiet --no-warnings -o "${outputPath}" "${url}"`;
+
+    console.log('Executing yt-dlp...');
+    const { stdout, stderr } = await execPromise(command, {
+      timeout: 120000, // 2 minute timeout
+    });
+
+    if (stderr && !stderr.includes('WARNING')) {
+      console.warn('yt-dlp stderr:', stderr);
+    }
+
+    // Verify file was downloaded
+    const stats = await fsPromises.stat(outputPath);
+    if (stats.size === 0) {
+      throw new Error('Downloaded file is empty');
+    }
+
+    console.log(`yt-dlp download complete: ${stats.size} bytes`);
+    return outputPath;
+  } catch (error) {
+    console.error('yt-dlp error:', error);
+    throw new Error(`Failed to download with yt-dlp: ${error.message}`);
+  }
+}
+
+/**
  * Download video from URL (TikTok, YouTube, Instagram)
  */
 export async function downloadVideo(url, outputPath) {
   try {
     console.log('Attempting to download from:', url);
 
-    // Check if it's a YouTube URL
-    if (ytdl.validateURL(url)) {
-      return await downloadYouTubeVideo(url, outputPath);
+    // Try yt-dlp first (works for most platforms)
+    try {
+      return await downloadWithYtDlp(url, outputPath);
+    } catch (ytDlpError) {
+      console.log('yt-dlp failed, trying fallback methods:', ytDlpError.message);
+
+      // Fallback: Try ytdl-core for YouTube
+      if (ytdl.validateURL(url)) {
+        console.log('Falling back to ytdl-core for YouTube...');
+        return await downloadYouTubeVideo(url, outputPath);
+      }
+
+      // If yt-dlp failed and it's not YouTube, throw error
+      throw new Error(`Video download failed. ${ytDlpError.message.includes('yt-dlp') ? 'Please use File Upload instead.' : ytDlpError.message}`);
     }
-
-    // For TikTok and Instagram - use axios with proper headers and redirect handling
-    const response = await axios({
-      method: 'GET',
-      url: url,
-      responseType: 'stream',
-      maxRedirects: 10,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Referer': 'https://www.tiktok.com/'
-      },
-      timeout: 60000, // 60 second timeout
-    });
-
-    console.log('Response status:', response.status);
-    console.log('Content-Type:', response.headers['content-type']);
-
-    // Check if we got HTML instead of video
-    const contentType = response.headers['content-type'] || '';
-    if (contentType.includes('text/html') || contentType.includes('application/json')) {
-      throw new Error('TikTok/Instagram URLs require direct video links. Please use File Upload instead, or try a different URL format.');
-    }
-
-    // Verify we're getting video content
-    if (!contentType.includes('video') && !contentType.includes('octet-stream')) {
-      console.warn(`Unexpected content type: ${contentType}`);
-    }
-
-    const writer = fs.createWriteStream(outputPath);
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-      let downloadedBytes = 0;
-
-      response.data.on('data', (chunk) => {
-        downloadedBytes += chunk.length;
-      });
-
-      writer.on('finish', async () => {
-        console.log(`Downloaded ${downloadedBytes} bytes to ${outputPath}`);
-
-        // Verify file exists and has content
-        try {
-          const stats = await fsPromises.stat(outputPath);
-          if (stats.size === 0) {
-            reject(new Error('Downloaded file is empty'));
-            return;
-          }
-
-          // Check if file is too small (likely HTML/error page)
-          if (stats.size < 50000) { // Less than 50KB is suspicious for a video
-            console.warn(`Downloaded file is suspiciously small: ${stats.size} bytes`);
-            // Read first few bytes to check if it's HTML
-            const buffer = await fsPromises.readFile(outputPath, { encoding: 'utf8', flag: 'r' });
-            const firstChunk = buffer.substring(0, 500);
-            if (firstChunk.includes('<!DOCTYPE') || firstChunk.includes('<html')) {
-              reject(new Error('TikTok/Instagram blocked the download. Please use File Upload instead.'));
-              return;
-            }
-          }
-
-          console.log('File size verified:', stats.size, 'bytes');
-          resolve(outputPath);
-        } catch (err) {
-          reject(new Error(`Failed to verify downloaded file: ${err.message}`));
-        }
-      });
-
-      writer.on('error', reject);
-      response.data.on('error', reject);
-    });
   } catch (error) {
     console.error('Error downloading video:', error.message);
     throw new Error(`Failed to download video: ${error.message}`);
