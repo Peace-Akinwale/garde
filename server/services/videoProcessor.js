@@ -28,29 +28,63 @@ if (process.env.NODE_ENV === 'production') {
  */
 export async function downloadVideo(url, outputPath) {
   try {
+    console.log('Attempting to download from:', url);
+
     // Check if it's a YouTube URL
     if (ytdl.validateURL(url)) {
       return await downloadYouTubeVideo(url, outputPath);
     }
 
-    // For TikTok and Instagram, we'll use a direct download approach
-    // Note: In production, you'd want to use yt-dlp via child_process
-    // For now, we'll use a simplified approach
+    // For TikTok and Instagram - use axios with proper headers and redirect handling
     const response = await axios({
       method: 'GET',
       url: url,
       responseType: 'stream',
+      maxRedirects: 10,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Referer': 'https://www.tiktok.com/'
+      },
+      timeout: 60000, // 60 second timeout
     });
+
+    console.log('Response status:', response.status);
+    console.log('Content-Type:', response.headers['content-type']);
 
     const writer = fs.createWriteStream(outputPath);
     response.data.pipe(writer);
 
     return new Promise((resolve, reject) => {
-      writer.on('finish', () => resolve(outputPath));
+      let downloadedBytes = 0;
+
+      response.data.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+      });
+
+      writer.on('finish', async () => {
+        console.log(`Downloaded ${downloadedBytes} bytes to ${outputPath}`);
+
+        // Verify file exists and has content
+        try {
+          const stats = await fsPromises.stat(outputPath);
+          if (stats.size === 0) {
+            reject(new Error('Downloaded file is empty'));
+            return;
+          }
+          console.log('File size verified:', stats.size, 'bytes');
+          resolve(outputPath);
+        } catch (err) {
+          reject(new Error(`Failed to verify downloaded file: ${err.message}`));
+        }
+      });
+
       writer.on('error', reject);
+      response.data.on('error', reject);
     });
   } catch (error) {
-    console.error('Error downloading video:', error);
+    console.error('Error downloading video:', error.message);
     throw new Error(`Failed to download video: ${error.message}`);
   }
 }
@@ -60,14 +94,58 @@ export async function downloadVideo(url, outputPath) {
  */
 async function downloadYouTubeVideo(url, outputPath) {
   return new Promise((resolve, reject) => {
-    const stream = ytdl(url, { quality: 'lowest' });
-    const writer = fs.createWriteStream(outputPath);
+    console.log('Downloading YouTube video:', url);
 
-    stream.pipe(writer);
+    try {
+      const stream = ytdl(url, {
+        quality: 'lowest',
+        filter: 'videoandaudio'
+      });
 
-    writer.on('finish', () => resolve(outputPath));
-    writer.on('error', reject);
-    stream.on('error', reject);
+      const writer = fs.createWriteStream(outputPath);
+      let downloadedBytes = 0;
+
+      stream.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+      });
+
+      stream.on('info', (info) => {
+        console.log('YouTube video info:', info.videoDetails.title);
+        console.log('Duration:', info.videoDetails.lengthSeconds, 'seconds');
+      });
+
+      stream.pipe(writer);
+
+      writer.on('finish', async () => {
+        console.log(`YouTube download complete: ${downloadedBytes} bytes`);
+
+        // Verify file
+        try {
+          const stats = await fsPromises.stat(outputPath);
+          if (stats.size === 0) {
+            reject(new Error('Downloaded YouTube file is empty'));
+            return;
+          }
+          console.log('YouTube file verified:', stats.size, 'bytes');
+          resolve(outputPath);
+        } catch (err) {
+          reject(new Error(`Failed to verify YouTube file: ${err.message}`));
+        }
+      });
+
+      writer.on('error', (err) => {
+        console.error('Writer error:', err);
+        reject(err);
+      });
+
+      stream.on('error', (err) => {
+        console.error('YouTube stream error:', err);
+        reject(new Error(`YouTube download failed: ${err.message}`));
+      });
+    } catch (error) {
+      console.error('YouTube download error:', error);
+      reject(error);
+    }
   });
 }
 
