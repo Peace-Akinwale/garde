@@ -347,20 +347,42 @@ export async function transcribeAudio(audioPath, language = null) {
 /**
  * Extract structured guide/recipe from transcription using Claude
  */
-export async function extractGuideFromText(transcriptionText, guideType = 'auto') {
+export async function extractGuideFromText(transcriptionText, detectedLanguage = 'en') {
   try {
-    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions. You excel at understanding content even when transcriptions have errors or mixed languages.
+    // Check if this is a Yoruba video (needs flexible interpretation)
+    const isYoruba = detectedLanguage === 'yo' || detectedLanguage === 'yor';
 
-The following is a transcription of a video (possibly in Yoruba, English, or other languages). Note that speech-to-text may have spelling errors or misheard words, especially with Yoruba or Nigerian English:
+    // Base prompt for all languages
+    let languageInstructions = '';
 
-"${transcriptionText}"
-
-IMPORTANT INSTRUCTIONS:
+    if (isYoruba) {
+      // Special instructions for Yoruba - be flexible with errors
+      languageInstructions = `
+IMPORTANT INSTRUCTIONS FOR YORUBA CONTENT:
 - Be flexible with spelling and pronunciation variations (e.g., "egusi" might be transcribed as "egushi" or "aigusi")
 - Yoruba words may be misspelled - use context to understand ingredients and actions
 - Nigerian English and pidgin are common - interpret meanings generously
 - If you see garbled text, try to infer the intended meaning from cooking context
-- Common Yoruba ingredients: ata rodo (scotch bonnet), efo (vegetables), iru (locust beans), etc.
+- Common Yoruba ingredients: ata rodo (scotch bonnet), efo (vegetables), iru (locust beans), obe (stew), etc.
+- Correct any obvious transcription errors in your output while preserving the original meaning
+`;
+    } else {
+      // Standard instructions for English and other languages - be accurate
+      languageInstructions = `
+IMPORTANT INSTRUCTIONS:
+- Extract information accurately as transcribed
+- Only correct obvious and clear transcription errors
+- Preserve the exact terminology and measurements used
+- Maintain the speaker's original wording and style
+`;
+    }
+
+    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions.
+
+The following is a transcription of a video:
+
+"${transcriptionText}"
+${languageInstructions}
 
 Please analyze this transcription and extract a structured guide. Determine if this is:
 1. A cooking recipe
@@ -374,9 +396,9 @@ Return a JSON object with this structure:
   "type": "recipe|craft|howto|other",
   "category": "specific category (e.g., Nigerian cuisine, soap making, woodworking)",
   "language": "detected primary language (use 'yo' for Yoruba, 'en' for English)",
-  "ingredients": ["list", "of", "ingredients or materials - correct any obvious transcription errors"],
+  "ingredients": ["list", "of", "ingredients or materials"],
   "steps": [
-    "Step 1: Clear instruction (fix any transcription errors while preserving meaning)",
+    "Step 1: Clear instruction",
     "Step 2: Next instruction",
     "..."
   ],
@@ -386,8 +408,6 @@ Return a JSON object with this structure:
   "tips": ["any", "helpful", "tips or notes mentioned"],
   "summary": "A brief 2-3 sentence summary of what this guide teaches"
 }
-
-Be generous in your interpretation - focus on the cooking/tutorial intent rather than perfect transcription. If you recognize Nigerian/Yoruba food terms even when misspelled, correct them in your output.
 
 If the transcription doesn't contain a clear guide or recipe, set type to "unclear" and provide what you can extract.
 
@@ -476,8 +496,8 @@ export async function processVideo(videoSource, isFile = false, userId) {
       }
     }
 
-    // Step 4: Extract structured guide with Claude
-    const extractedGuide = await extractGuideFromText(transcription.text);
+    // Step 4: Extract structured guide with Claude (pass language for context)
+    const extractedGuide = await extractGuideFromText(transcription.text, transcription.language);
 
     // Step 5: Cleanup temp files
     await fsPromises.rm(tempDir, { recursive: true, force: true });
