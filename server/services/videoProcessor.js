@@ -1,0 +1,233 @@
+import ffmpeg from 'fluent-ffmpeg';
+import ytdl from '@distube/ytdl-core';
+import axios from 'axios';
+import fs from 'fs';
+import fsPromises from 'fs/promises';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { openai, anthropic } from '../index.js';
+
+/**
+ * Download video from URL (TikTok, YouTube, Instagram)
+ */
+export async function downloadVideo(url, outputPath) {
+  try {
+    // Check if it's a YouTube URL
+    if (ytdl.validateURL(url)) {
+      return await downloadYouTubeVideo(url, outputPath);
+    }
+
+    // For TikTok and Instagram, we'll use a direct download approach
+    // Note: In production, you'd want to use yt-dlp via child_process
+    // For now, we'll use a simplified approach
+    const response = await axios({
+      method: 'GET',
+      url: url,
+      responseType: 'stream',
+    });
+
+    const writer = fs.createWriteStream(outputPath);
+    response.data.pipe(writer);
+
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => resolve(outputPath));
+      writer.on('error', reject);
+    });
+  } catch (error) {
+    console.error('Error downloading video:', error);
+    throw new Error(`Failed to download video: ${error.message}`);
+  }
+}
+
+/**
+ * Download YouTube video
+ */
+async function downloadYouTubeVideo(url, outputPath) {
+  return new Promise((resolve, reject) => {
+    const stream = ytdl(url, { quality: 'lowest' });
+    const writer = fs.createWriteStream(outputPath);
+
+    stream.pipe(writer);
+
+    writer.on('finish', () => resolve(outputPath));
+    writer.on('error', reject);
+    stream.on('error', reject);
+  });
+}
+
+/**
+ * Extract audio from video file
+ */
+export async function extractAudio(videoPath, audioPath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .output(audioPath)
+      .audioCodec('libmp3lame')
+      .audioBitrate('128k')
+      .format('mp3')
+      .on('end', () => resolve(audioPath))
+      .on('error', (err) => reject(new Error(`Audio extraction failed: ${err.message}`)))
+      .run();
+  });
+}
+
+/**
+ * Transcribe audio using OpenAI Whisper
+ * Supports Yoruba and 98+ other languages
+ */
+export async function transcribeAudio(audioPath, language = null) {
+  try {
+    const audioFile = await fsPromises.readFile(audioPath);
+    const blob = new Blob([audioFile], { type: 'audio/mp3' });
+    const file = new File([blob], path.basename(audioPath), { type: 'audio/mp3' });
+
+    // Build options object - only include language if specified
+    const options = {
+      file: file,
+      model: 'whisper-1',
+      response_format: 'verbose_json',
+    };
+
+    // Only add language if it's not null (otherwise auto-detect)
+    if (language) {
+      options.language = language;
+    }
+
+    const transcription = await openai.audio.transcriptions.create(options);
+
+    return {
+      text: transcription.text,
+      language: transcription.language,
+      duration: transcription.duration,
+    };
+  } catch (error) {
+    console.error('Transcription error:', error);
+    throw new Error(`Transcription failed: ${error.message}`);
+  }
+}
+
+/**
+ * Extract structured guide/recipe from transcription using Claude
+ */
+export async function extractGuideFromText(transcriptionText, guideType = 'auto') {
+  try {
+    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions.
+
+The following is a transcription of a video (possibly in Yoruba, English, or other languages):
+
+"${transcriptionText}"
+
+Please analyze this transcription and extract a structured guide. Determine if this is:
+1. A cooking recipe
+2. A craft/DIY project (soap making, furniture, clothing, etc.)
+3. A general how-to guide
+4. Something else
+
+Return a JSON object with this structure:
+{
+  "title": "Brief descriptive title of the guide/recipe",
+  "type": "recipe|craft|howto|other",
+  "category": "specific category (e.g., Nigerian cuisine, soap making, woodworking)",
+  "language": "detected primary language",
+  "ingredients": ["list", "of", "ingredients or materials"],
+  "steps": [
+    "Step 1: Clear instruction",
+    "Step 2: Next instruction",
+    "..."
+  ],
+  "duration": "estimated time if mentioned (e.g., '30 minutes', '2 hours')",
+  "servings": "if applicable (for recipes)",
+  "difficulty": "easy|medium|hard",
+  "tips": ["any", "helpful", "tips or notes mentioned"],
+  "summary": "A brief 2-3 sentence summary of what this guide teaches"
+}
+
+If the transcription doesn't contain a clear guide or recipe, set type to "unclear" and provide what you can extract.
+
+IMPORTANT: Return ONLY the JSON object, no additional text.`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    // Extract JSON from Claude's response
+    const responseText = message.content[0].text;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new Error('Could not extract JSON from Claude response');
+    }
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('Guide extraction error:', error);
+    throw new Error(`Failed to extract guide: ${error.message}`);
+  }
+}
+
+/**
+ * Complete video processing pipeline
+ */
+export async function processVideo(videoSource, isFile = false, userId) {
+  const sessionId = uuidv4();
+  const tempDir = path.join(process.cwd(), 'uploads', sessionId);
+
+  try {
+    // Create temp directory
+    await fsPromises.mkdir(tempDir, { recursive: true });
+
+    const videoPath = path.join(tempDir, 'video.mp4');
+    const audioPath = path.join(tempDir, 'audio.mp3');
+
+    // Step 1: Get video file
+    if (isFile) {
+      // videoSource is already a file path
+      await fsPromises.copyFile(videoSource, videoPath);
+    } else {
+      // videoSource is a URL
+      await downloadVideo(videoSource, videoPath);
+    }
+
+    // Step 2: Extract audio
+    await extractAudio(videoPath, audioPath);
+
+    // Step 3: Transcribe audio with Whisper
+    const transcription = await transcribeAudio(audioPath);
+
+    // Step 4: Extract structured guide with Claude
+    const extractedGuide = await extractGuideFromText(transcription.text);
+
+    // Step 5: Cleanup temp files
+    await fsPromises.rm(tempDir, { recursive: true, force: true });
+
+    return {
+      success: true,
+      transcription: {
+        text: transcription.text,
+        language: transcription.language,
+        duration: transcription.duration,
+      },
+      guide: extractedGuide,
+      metadata: {
+        processedAt: new Date().toISOString(),
+        source: isFile ? 'upload' : 'url',
+      },
+    };
+  } catch (error) {
+    // Cleanup on error
+    try {
+      await fsPromises.rm(tempDir, { recursive: true, force: true });
+    } catch (cleanupError) {
+      console.error('Cleanup error:', cleanupError);
+    }
+
+    throw error;
+  }
+}

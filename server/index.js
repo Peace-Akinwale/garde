@@ -1,0 +1,79 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+import videoRoutes from './routes/video.js';
+import guideRoutes from './routes/guides.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables
+dotenv.config();
+
+// Initialize Express app
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Initialize Supabase client with service role (admin access)
+// This bypasses Row Level Security for backend operations
+export const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
+
+// Initialize OpenAI client (for Whisper)
+export const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Initialize Anthropic client (for Claude)
+export const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+// Create uploads directory
+const uploadsDir = path.join(__dirname, 'uploads');
+fs.mkdir(uploadsDir, { recursive: true }).catch(() => {
+  // Directory already exists, ignore error
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Garde API is running' });
+});
+
+// Routes
+app.use('/api/video', videoRoutes);
+app.use('/api/guides', guideRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: err.message,
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Garde server running on http://localhost:${PORT}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV}`);
+});

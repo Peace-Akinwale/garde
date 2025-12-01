@@ -1,0 +1,22 @@
+{
+  "name": "garde",
+  "version": "1.0.0",
+  "description": "AI-powered recipe and how-to guide keeper with multilingual support",
+  "private": true,
+  "scripts": {
+    "install-all": "cd server && npm install && cd ../client && npm install",
+    "dev": "echo Please use start-app.bat or run backend and frontend separately",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev"
+  },
+  "keywords": [
+    "recipe",
+    "howto",
+    "ai",
+    "yoruba",
+    "multilingual",
+    "video-processing"
+  ],
+  "author": "",
+  "license": "MIT"
+}
