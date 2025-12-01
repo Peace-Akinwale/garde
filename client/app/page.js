@@ -7,7 +7,8 @@ import GuideCard from '@/components/GuideCard';
 import AddGuideModal from '@/components/AddGuideModal';
 import SearchBar from '@/components/SearchBar';
 import AuthModal from '@/components/AuthModal';
-import { Plus, LogOut, User, Moon, Sun } from 'lucide-react';
+import NotificationsModal from '@/components/NotificationsModal';
+import { Plus, LogOut, User, Moon, Sun, Bell } from 'lucide-react';
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -15,6 +16,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
@@ -139,6 +141,15 @@ export default function Home() {
                 <span className="hidden sm:inline">Add Guide</span>
               </button>
               <button
+                onClick={() => setShowNotifications(true)}
+                className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition relative"
+                title="What's New"
+              >
+                <Bell size={20} />
+                {/* New updates indicator */}
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+              <button
                 onClick={toggleDarkMode}
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
@@ -221,6 +232,12 @@ export default function Home() {
           userId={user.id}
         />
       )}
+
+      {/* Notifications Modal */}
+      <NotificationsModal
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </div>
   );
 }

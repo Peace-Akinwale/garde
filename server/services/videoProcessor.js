@@ -349,11 +349,18 @@ export async function transcribeAudio(audioPath, language = null) {
  */
 export async function extractGuideFromText(transcriptionText, guideType = 'auto') {
   try {
-    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions.
+    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions. You excel at understanding content even when transcriptions have errors or mixed languages.
 
-The following is a transcription of a video (possibly in Yoruba, English, or other languages):
+The following is a transcription of a video (possibly in Yoruba, English, or other languages). Note that speech-to-text may have spelling errors or misheard words, especially with Yoruba or Nigerian English:
 
 "${transcriptionText}"
+
+IMPORTANT INSTRUCTIONS:
+- Be flexible with spelling and pronunciation variations (e.g., "egusi" might be transcribed as "egushi" or "aigusi")
+- Yoruba words may be misspelled - use context to understand ingredients and actions
+- Nigerian English and pidgin are common - interpret meanings generously
+- If you see garbled text, try to infer the intended meaning from cooking context
+- Common Yoruba ingredients: ata rodo (scotch bonnet), efo (vegetables), iru (locust beans), etc.
 
 Please analyze this transcription and extract a structured guide. Determine if this is:
 1. A cooking recipe
@@ -366,10 +373,10 @@ Return a JSON object with this structure:
   "title": "Brief descriptive title of the guide/recipe",
   "type": "recipe|craft|howto|other",
   "category": "specific category (e.g., Nigerian cuisine, soap making, woodworking)",
-  "language": "detected primary language",
-  "ingredients": ["list", "of", "ingredients or materials"],
+  "language": "detected primary language (use 'yo' for Yoruba, 'en' for English)",
+  "ingredients": ["list", "of", "ingredients or materials - correct any obvious transcription errors"],
   "steps": [
-    "Step 1: Clear instruction",
+    "Step 1: Clear instruction (fix any transcription errors while preserving meaning)",
     "Step 2: Next instruction",
     "..."
   ],
@@ -379,6 +386,8 @@ Return a JSON object with this structure:
   "tips": ["any", "helpful", "tips or notes mentioned"],
   "summary": "A brief 2-3 sentence summary of what this guide teaches"
 }
+
+Be generous in your interpretation - focus on the cooking/tutorial intent rather than perfect transcription. If you recognize Nigerian/Yoruba food terms even when misspelled, correct them in your output.
 
 If the transcription doesn't contain a clear guide or recipe, set type to "unclear" and provide what you can extract.
 
