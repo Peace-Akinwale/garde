@@ -10,11 +10,12 @@ chmod +x ffmpeg ffprobe
 cd ..
 
 echo "Installing yt-dlp..."
-curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp || wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp
-chmod a+rx /usr/local/bin/yt-dlp
+mkdir -p yt-dlp-bin
+curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp-bin/yt-dlp || wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O yt-dlp-bin/yt-dlp
+chmod a+rx yt-dlp-bin/yt-dlp
 
 echo "Verifying yt-dlp installation..."
-yt-dlp --version
+./yt-dlp-bin/yt-dlp --version
 
 echo "Installing Node.js dependencies..."
 npm install

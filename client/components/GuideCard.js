@@ -12,6 +12,7 @@ import {
   Clock,
   Users,
   TrendingUp,
+  Video,
 } from 'lucide-react';
 import GuideDetailModal from './GuideDetailModal';
 
@@ -77,11 +78,18 @@ export default function GuideCard({ guide, onDeleted }) {
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <div className={`flex items-center gap-2 px-2 py-1 rounded-md ${badgeColor}`}>
-            <Icon size={16} />
-            <span className="text-xs font-medium uppercase tracking-wide">
-              {guide.type}
-            </span>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-2 px-2 py-1 rounded-md ${badgeColor}`}>
+              <Icon size={16} />
+              <span className="text-xs font-medium uppercase tracking-wide">
+                {guide.type}
+              </span>
+            </div>
+            {guide.source_url && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-100 text-blue-700" title="Has video">
+                <Video size={14} />
+              </div>
+            )}
           </div>
           <button
             onClick={handleDelete}

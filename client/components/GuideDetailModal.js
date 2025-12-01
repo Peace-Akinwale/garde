@@ -247,6 +247,23 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
             )}
           </div>
 
+          {/* Video Player */}
+          {guide.source_url && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Original Video</h3>
+              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+                <iframe
+                  src={guide.source_url.includes('youtube.com') || guide.source_url.includes('youtu.be')
+                    ? guide.source_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
+                    : guide.source_url}
+                  className="w-full h-full"
+                  allowFullScreen
+                  title="Original video"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Summary */}
           {(editing || guide.summary) && (
             <div>

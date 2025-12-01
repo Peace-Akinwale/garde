@@ -14,15 +14,23 @@ const execPromise = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configure FFmpeg path for production (Render)
+// Configure FFmpeg and yt-dlp paths for production (Render)
+let ytDlpPath = 'yt-dlp'; // default to system yt-dlp
+
 if (process.env.NODE_ENV === 'production') {
   const ffmpegPath = path.join(__dirname, '..', 'ffmpeg-bin', 'ffmpeg');
   const ffprobePath = path.join(__dirname, '..', 'ffmpeg-bin', 'ffprobe');
+  const localYtDlpPath = path.join(__dirname, '..', 'yt-dlp-bin', 'yt-dlp');
 
   if (fs.existsSync(ffmpegPath)) {
     ffmpeg.setFfmpegPath(ffmpegPath);
     ffmpeg.setFfprobePath(ffprobePath);
     console.log('✓ Using static FFmpeg binary for production');
+  }
+
+  if (fs.existsSync(localYtDlpPath)) {
+    ytDlpPath = localYtDlpPath;
+    console.log('✓ Using local yt-dlp binary for production');
   }
 }
 
@@ -34,9 +42,9 @@ async function downloadWithYtDlp(url, outputPath) {
     console.log('Using yt-dlp to download:', url);
 
     // yt-dlp command with options
-    const command = `yt-dlp -f "best[ext=mp4]/best" --no-playlist --quiet --no-warnings -o "${outputPath}" "${url}"`;
+    const command = `"${ytDlpPath}" -f "best[ext=mp4]/best" --no-playlist --quiet --no-warnings -o "${outputPath}" "${url}"`;
 
-    console.log('Executing yt-dlp...');
+    console.log('Executing yt-dlp:', command);
     const { stdout, stderr } = await execPromise(command, {
       timeout: 120000, // 2 minute timeout
     });
