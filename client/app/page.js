@@ -125,7 +125,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Garde</h1>
+              <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">Garde</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Your personal recipe & guide keeper
               </p>
