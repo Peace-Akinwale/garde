@@ -11,6 +11,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState(null);
+  const [abortController, setAbortController] = useState(null);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
@@ -30,6 +31,10 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
     setError(null);
     setProcessing(true);
 
+    // Create AbortController for this request
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
       let result;
 
@@ -41,7 +46,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         }
 
         setProgress('Downloading video...');
-        result = await videoAPI.processUrl(url, userId);
+        result = await videoAPI.processUrl(url, userId, controller.signal);
       } else {
         if (!file) {
           setError('Please select a video file');
@@ -50,7 +55,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         }
 
         setProgress('Uploading video...');
-        result = await videoAPI.processUpload(file, userId);
+        result = await videoAPI.processUpload(file, userId, controller.signal);
       }
 
       if (!result.success) {
@@ -83,11 +88,28 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         resetForm();
       }, 500);
     } catch (error) {
-      console.error('Error processing video:', error);
-      setError(error.message || 'Failed to process video. Please try again.');
+      // Check if the error was due to cancellation
+      if (error.name === 'AbortError' || error.message.includes('cancel')) {
+        console.log('Video processing cancelled by user');
+        setError(null); // Don't show error for user-initiated cancellation
+      } else {
+        console.error('Error processing video:', error);
+        setError(error.message || 'Failed to process video. Please try again.');
+      }
       setProcessing(false);
       setProgress('');
+      setAbortController(null);
     }
+  };
+
+  const handleCancel = () => {
+    // Abort the ongoing request if there is one
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    resetForm();
+    onClose();
   };
 
   const resetForm = () => {
@@ -96,6 +118,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
     setProcessing(false);
     setProgress('');
     setError(null);
+    setAbortController(null);
   };
 
   if (!isOpen) return null;
@@ -104,9 +127,9 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 relative">
         <button
-          onClick={onClose}
-          disabled={processing}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          onClick={handleCancel}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+          title={processing ? "Cancel processing" : "Close"}
         >
           <X size={24} />
         </button>
@@ -217,11 +240,10 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={onClose}
-              disabled={processing}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+              onClick={handleCancel}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
             >
-              Cancel
+              {processing ? 'Cancel Processing' : 'Cancel'}
             </button>
             <button
               type="submit"

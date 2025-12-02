@@ -13,15 +13,18 @@ export const videoAPI = {
   /**
    * Process video from URL
    */
-  processUrl: async (url, userId) => {
-    const response = await api.post('/api/video/process-url', { url, userId });
+  processUrl: async (url, userId, signal = null) => {
+    const response = await api.post('/api/video/process-url', { url, userId }, {
+      signal,
+      timeout: 300000, // 5 minute timeout
+    });
     return response.data;
   },
 
   /**
    * Process uploaded video file
    */
-  processUpload: async (file, userId) => {
+  processUpload: async (file, userId, signal = null) => {
     const formData = new FormData();
     formData.append('video', file);
     formData.append('userId', userId);
@@ -30,6 +33,8 @@ export const videoAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      signal,
+      timeout: 300000, // 5 minute timeout
     });
     return response.data;
   },
