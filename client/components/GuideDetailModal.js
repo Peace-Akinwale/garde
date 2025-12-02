@@ -29,6 +29,8 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editedGuide, setEditedGuide] = useState({ ...guide });
+  const [showCopyToast, setShowCopyToast] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(true);
 
   const Icon = typeIcons[guide.type] || FileQuestion;
 
@@ -59,26 +61,54 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
   const handleShare = async () => {
     const shareText = `${guide.title}\n\n${guide.summary || ''}\n\nIngredients:\n${guide.ingredients?.map(i => `• ${i}`).join('\n') || ''}\n\nSteps:\n${guide.steps?.map((s, i) => `${i + 1}. ${s}`).join('\n') || ''}\n\nShared from Garde`;
 
+    // Try native share first (mobile)
     if (navigator.share) {
       try {
         await navigator.share({
           title: guide.title,
           text: shareText,
         });
+        return; // Success, no need for toast
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('Error sharing:', error);
+        if (error.name === 'AbortError') {
+          return; // User cancelled, don't show error
+        }
+        // Share failed, fall through to clipboard
+      }
+    }
+
+    // Fallback: Copy to clipboard (desktop)
+    try {
+      // Modern async clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareText);
+        setCopySuccess(true);
+        setShowCopyToast(true);
+        setTimeout(() => setShowCopyToast(false), 3000);
+      } else {
+        // Legacy fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = shareText;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (success) {
+          setCopySuccess(true);
+          setShowCopyToast(true);
+          setTimeout(() => setShowCopyToast(false), 3000);
+        } else {
+          throw new Error('Copy failed');
         }
       }
-    } else {
-      // Fallback: Copy to clipboard
-      try {
-        await navigator.clipboard.writeText(shareText);
-        alert('Recipe copied to clipboard! You can now paste it anywhere.');
-      } catch (error) {
-        console.error('Error copying:', error);
-        alert('Sharing not supported on this device');
-      }
+    } catch (error) {
+      console.error('Error copying:', error);
+      setCopySuccess(false);
+      setShowCopyToast(true);
+      setTimeout(() => setShowCopyToast(false), 4000);
     }
   };
 
@@ -248,12 +278,45 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
             )}
           </div>
 
+          {/* Timestamps */}
+          {guide.created_at && (
+            <div className="mb-6">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <p>
+                  <span className="font-medium">Created:</span>{' '}
+                  {new Date(guide.created_at).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </p>
+                {guide.updated_at && guide.updated_at !== guide.created_at && (
+                  <p className="mt-1">
+                    <span className="font-medium">Last edited:</span>{' '}
+                    {new Date(guide.updated_at).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Video Player */}
           {guide.source_url && (() => {
             const isTikTok = guide.source_url.includes('tiktok.com');
             const isInstagram = guide.source_url.includes('instagram.com');
+            const isTwitter = guide.source_url.includes('twitter.com') || guide.source_url.includes('x.com');
             const isYouTube = guide.source_url.includes('youtube.com') || guide.source_url.includes('youtu.be');
-            const canEmbed = !isTikTok && !isInstagram;
+            const canEmbed = !isTikTok && !isInstagram && !isTwitter;
 
             return (
               <div className="mb-6">
@@ -274,11 +337,15 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                     href={guide.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-3 p-6 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg transition shadow-lg"
+                    className={`flex items-center justify-center gap-3 p-6 ${
+                      isTwitter
+                        ? 'bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700'
+                        : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
+                    } text-white rounded-lg transition shadow-lg`}
                   >
                     <Video size={24} />
                     <div className="text-left">
-                      <p className="font-semibold">Watch on {isTikTok ? 'TikTok' : 'Instagram'}</p>
+                      <p className="font-semibold">Watch on {isTwitter ? 'X' : isTikTok ? 'TikTok' : 'Instagram'}</p>
                       <p className="text-sm text-white/90">Click to open original video</p>
                     </div>
                   </a>
@@ -435,6 +502,33 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           )}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {showCopyToast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+          <div className={`flex items-center gap-3 px-6 py-3 rounded-lg shadow-lg ${
+            copySuccess
+              ? 'bg-green-500 text-white'
+              : 'bg-red-500 text-white'
+          }`}>
+            {copySuccess ? (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-medium">Copied to clipboard!</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span className="font-medium">Copy failed. Please try manually.</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

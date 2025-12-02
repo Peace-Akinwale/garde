@@ -16,6 +16,26 @@ import {
 } from 'lucide-react';
 import GuideDetailModal from './GuideDetailModal';
 
+// Utility function to format timestamps as relative time
+function formatTimeAgo(dateString) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
+
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 const typeIcons = {
   recipe: ChefHat,
   craft: Hammer,
@@ -88,6 +108,15 @@ export default function GuideCard({ guide, onDeleted }) {
             {guide.source_url && (
               <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-100 text-blue-700" title="Has video">
                 <Video size={14} />
+              </div>
+            )}
+            {guide.created_at && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-gray-600 dark:bg-slate-600 dark:text-gray-300 text-xs"
+                title={new Date(guide.created_at).toLocaleString()}
+              >
+                <Clock size={12} />
+                <span>{formatTimeAgo(guide.created_at)}</span>
               </div>
             )}
           </div>

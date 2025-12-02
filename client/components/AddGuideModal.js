@@ -162,7 +162,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           {mode === 'url' ? (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Video URL (TikTok, YouTube, Instagram)
+                Video URL (TikTok, YouTube, Instagram, X/Twitter)
               </label>
               <input
                 type="url"
@@ -177,7 +177,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
                 Paste the link to the video containing the recipe or guide
               </p>
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                <strong>Supported:</strong> TikTok (videos & photos), Instagram, Facebook, Twitter, and 1000+ platforms
+                <strong>Supported:</strong> TikTok, Instagram, X/Twitter, Facebook, YouTube, and 1000+ platforms
               </div>
             </div>
           ) : (
