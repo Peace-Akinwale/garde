@@ -5,7 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { shoppingAPI } from '@/lib/api';
 import { ShoppingCart, Plus, Trash2, Copy, Check, ExternalLink, Edit2, X } from 'lucide-react';
 import { generateAllStoreLinks, detectUserRegion, REGIONS, getStoresForRegion } from '@/lib/smartLinks';
-import { v4 as uuidv4 } from 'uuid';
+
+// Use built-in crypto.randomUUID() instead of uuid package
+const generateId = () => crypto.randomUUID();
 
 export default function ShoppingPage() {
   const [user, setUser] = useState(null);
@@ -90,7 +92,7 @@ export default function ShoppingPage() {
     if (!itemName.trim()) return;
 
     const newItem = {
-      id: uuidv4(),
+      id: generateId(),
       name: itemName.trim(),
       quantity: '',
       category: 'Uncategorized',
