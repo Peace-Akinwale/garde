@@ -248,7 +248,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
 
         {processing && (
           <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3">
               {progress === 100 ? (
                 <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
               ) : (
@@ -256,23 +256,6 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
               )}
               <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentStep}</p>
             </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-2">
-              <div
-                className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 text-right">{progress}%</p>
-
-            {canClose && progress < 100 && (
-              <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-                <p className="text-xs text-green-700 dark:text-green-400">
-                  ✓ You can safely close this modal or browse away - processing will continue in the background!
-                </p>
-              </div>
-            )}
           </div>
         )}
 

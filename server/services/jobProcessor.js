@@ -12,7 +12,13 @@ async function updateJobStatus(jobId, updates) {
       .eq('id', jobId);
 
     if (error) throw error;
-    console.log(`Job ${jobId} updated:`, updates);
+
+    // Only log status changes and errors, not all updates
+    if (updates.status === 'completed') {
+      console.log(`✓ Job ${jobId}: Complete`);
+    } else if (updates.status === 'failed') {
+      console.log(`✗ Job ${jobId}: Failed - ${updates.error_message}`);
+    }
   } catch (error) {
     console.error('Error updating job status:', error);
   }
@@ -62,7 +68,7 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
       metadata: result.metadata
     });
 
-    console.log(`Job ${jobId} completed successfully`);
+    console.log(`✓ Job ${jobId} completed - ${result.guide.title || 'Guide'}`);
     return result;
 
   } catch (error) {

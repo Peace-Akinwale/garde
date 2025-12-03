@@ -590,23 +590,45 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 3: Transcribe audio with Whisper
       transcription = await transcribeAudio(audioPath);
 
-      // Step 4: ONLY extract frames if audio is poor/missing (to save time and cost)
-      // Most videos have good audio, so this will rarely run
-      if (!transcription.text || transcription.text.trim().length < 100) {
-        console.log('Minimal/no audio detected - using visual analysis');
+      // Step 4: Detect if this is actually a silent video with background music
+      const isLikelyMusicOrChant = (text) => {
+        if (!text || text.length < 50) return true;
+
+        // Check for repetitive content (music/chants repeat phrases)
+        const words = text.toLowerCase().split(/\s+/);
+        const uniqueWords = new Set(words);
+        const repetitionRatio = uniqueWords.size / words.length;
+
+        // If less than 30% unique words, it's likely repetitive music/chant
+        if (repetitionRatio < 0.3) {
+          console.log(`Detected repetitive audio (${Math.round(repetitionRatio * 100)}% unique) - likely background music`);
+          return true;
+        }
+
+        // Check for very short transcription relative to video duration
+        if (transcription.duration && text.length < transcription.duration * 3) {
+          console.log('Very sparse speech detected - likely background music');
+          return true;
+        }
+
+        return false;
+      };
+
+      // ONLY extract frames if audio is poor/missing/music
+      if (isLikelyMusicOrChant(transcription.text)) {
+        console.log('Silent/music video detected - using visual analysis');
         contentType = 'silent_video';
 
         console.log('Extracting frames for visual analysis...');
         const framePaths = await extractVideoFrames(videoPath, tempDir, 12); // 12 frames for silent videos
         const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
 
-        transcription.text = transcription.text
-          ? `Audio: ${transcription.text}\n\nVisual Analysis:\n${visionAnalysis.text}`
-          : visionAnalysis.text;
-        transcription.source = 'vision_and_audio';
+        transcription.text = visionAnalysis.text; // Use ONLY visual analysis for music videos
+        transcription.language = 'en'; // Vision returns English descriptions
+        transcription.source = 'vision';
       } else {
         // Good audio transcription - use it directly (fast!)
-        console.log('Good audio transcription - skipping frame extraction');
+        console.log('Clear speech detected - using audio transcription');
         contentType = 'video';
         transcription.source = 'audio';
       }
