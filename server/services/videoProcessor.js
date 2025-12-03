@@ -564,31 +564,25 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 3: Transcribe audio with Whisper
       transcription = await transcribeAudio(audioPath);
 
-      // Step 4: ALWAYS extract frames and analyze visually
-      // This captures text overlays, ingredients shown on screen, and cooking techniques
-      console.log('Extracting frames for visual analysis (in addition to audio)...');
-      const framePaths = await extractVideoFrames(videoPath, tempDir, 8); // Full quality: 8 frames
-      const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
-      // Note: Frames are deleted inside analyzeImagesWithVision() to optimize memory
-
-      // CASE 2B: Silent or minimal speech video
-      if (!transcription.text || transcription.text.trim().length < 50) {
-        console.log('Minimal speech detected - using primarily visual analysis');
+      // Step 4: ONLY extract frames if audio is poor/missing (to save time and cost)
+      // Most videos have good audio, so this will rarely run
+      if (!transcription.text || transcription.text.trim().length < 100) {
+        console.log('Minimal/no audio detected - using visual analysis');
         contentType = 'silent_video';
+
+        console.log('Extracting frames for visual analysis...');
+        const framePaths = await extractVideoFrames(videoPath, tempDir, 12); // 12 frames for silent videos
+        const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
 
         transcription.text = transcription.text
           ? `Audio: ${transcription.text}\n\nVisual Analysis:\n${visionAnalysis.text}`
           : visionAnalysis.text;
         transcription.source = 'vision_and_audio';
-      }
-      // CASE 2C: Video with both audio and visual content (most common)
-      else {
-        console.log('Combining audio transcription with visual analysis');
-        contentType = 'video_with_visual';
-
-        // Combine audio and visual - vision second so it supplements what was said
-        transcription.text = `Audio Transcription:\n${transcription.text}\n\nVisual Content (text on screen, ingredients shown, techniques demonstrated):\n${visionAnalysis.text}`;
-        transcription.source = 'audio_and_vision';
+      } else {
+        // Good audio transcription - use it directly (fast!)
+        console.log('Good audio transcription - skipping frame extraction');
+        contentType = 'video';
+        transcription.source = 'audio';
       }
     }
 

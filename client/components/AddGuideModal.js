@@ -82,7 +82,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
 
   const handleJobCompleted = async (job) => {
     try {
-      setCurrentStep('Saving guide...');
+      setCurrentStep('Processing...');
 
       // Save the extracted guide to database
       await guidesAPI.create({
@@ -144,7 +144,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           return;
         }
 
-        setCurrentStep('Creating processing job...');
+        setCurrentStep('Processing...');
         result = await videoAPI.processUrl(url, userId);
       } else {
         if (!file) {
@@ -153,17 +153,17 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           return;
         }
 
-        setCurrentStep('Uploading file...');
+        setCurrentStep('Uploading...');
         result = await videoAPI.processUpload(file, userId);
       }
 
       if (!result.success) {
-        throw new Error('Failed to create processing job');
+        throw new Error('Failed to start processing');
       }
 
       // Got job ID - start polling
       setJobId(result.jobId);
-      setCurrentStep('Processing started...');
+      setCurrentStep('Processing...');
       setCanClose(true); // User can now safely close the modal!
       startPolling(result.jobId);
 

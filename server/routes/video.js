@@ -40,20 +40,23 @@ router.post('/process-url', async (req, res) => {
 
     if (error) throw error;
 
-    // Start processing in background (DON'T WAIT!)
-    // This allows the response to return immediately
-    processVideoJob(job.id, url, false, userId).catch(err => {
-      console.error(`Background processing failed for job ${job.id}:`, err);
-    });
+    console.log(`Job ${job.id} created - responding to client immediately`);
 
-    console.log(`Job ${job.id} created and processing started`);
-
-    // Return job ID immediately
+    // Return job ID immediately FIRST
     res.json({
       success: true,
       jobId: job.id,
       message: 'Video processing started. You can close this page and come back later!',
       status: 'pending'
+    });
+
+    // THEN start processing in background (after response sent)
+    // Use setImmediate to ensure response is fully sent first
+    setImmediate(() => {
+      processVideoJob(job.id, url, false, userId).catch(err => {
+        console.error(`Background processing failed for job ${job.id}:`, err);
+      });
+      console.log(`Background processing started for job ${job.id}`);
     });
 
   } catch (error) {
@@ -104,19 +107,22 @@ router.post('/process-upload', upload.single('video'), async (req, res) => {
 
     if (error) throw error;
 
-    // Start processing in background
-    processVideoJob(job.id, req.file.path, true, userId).catch(err => {
-      console.error(`Background processing failed for job ${job.id}:`, err);
-    });
+    console.log(`Job ${job.id} created for file upload - responding immediately`);
 
-    console.log(`Job ${job.id} created for file upload`);
-
-    // Return immediately
+    // Return immediately FIRST
     res.json({
       success: true,
       jobId: job.id,
       message: 'Video uploaded and processing started. You can close this page!',
       status: 'pending'
+    });
+
+    // THEN start processing in background (after response sent)
+    setImmediate(() => {
+      processVideoJob(job.id, req.file.path, true, userId).catch(err => {
+        console.error(`Background processing failed for job ${job.id}:`, err);
+      });
+      console.log(`Background processing started for job ${job.id}`);
     });
 
   } catch (error) {
