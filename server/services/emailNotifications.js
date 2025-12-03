@@ -225,3 +225,37 @@ export const sendTestEmail = async (toEmail) => {
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Generic email sending function
+ * @param {object} options - Email options
+ * @param {string} options.to - Recipient email
+ * @param {string} options.subject - Email subject
+ * @param {string} options.html - Email HTML content
+ */
+export const sendEmail = async ({ to, subject, html }) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log('Resend API key not configured');
+      return { success: false, message: 'Resend not configured' };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'Garde <notifications@resend.dev>',
+      to,
+      subject,
+      html
+    });
+
+    if (error) {
+      console.error('Failed to send email:', error);
+      throw error;
+    }
+
+    console.log('✅ Email sent successfully:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+};

@@ -208,6 +208,7 @@ export default function GuideCard({ guide, onDeleted, userId }) {
       {showDetail && (
         <GuideDetailModal
           guide={guide}
+          userId={userId}
           isOpen={showDetail}
           onClose={() => setShowDetail(false)}
           onUpdated={onDeleted}

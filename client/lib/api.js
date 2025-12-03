@@ -204,4 +204,60 @@ export const adminAPI = {
   },
 };
 
+export const remindersAPI = {
+  /**
+   * Get all reminders for a user
+   */
+  getAll: async (userId) => {
+    const response = await api.get(`/api/reminders/${userId}`);
+    return response.data;
+  },
+
+  /**
+   * Create a new reminder
+   */
+  create: async (userId, guideId, reminderType, scheduledFor, title, message = null) => {
+    const response = await api.post('/api/reminders', {
+      userId,
+      guideId,
+      reminderType,
+      scheduledFor,
+      title,
+      message
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete a reminder
+   */
+  delete: async (reminderId) => {
+    const response = await api.delete(`/api/reminders/${reminderId}`);
+    return response.data;
+  },
+
+  /**
+   * Subscribe to push notifications
+   */
+  subscribePush: async (userId, subscription, userAgent = null) => {
+    const response = await api.post('/api/reminders/push/subscribe', {
+      userId,
+      subscription,
+      userAgent
+    });
+    return response.data;
+  },
+
+  /**
+   * Unsubscribe from push notifications
+   */
+  unsubscribePush: async (userId, endpoint) => {
+    const response = await api.post('/api/reminders/push/unsubscribe', {
+      userId,
+      endpoint
+    });
+    return response.data;
+  },
+};
+
 export default api;

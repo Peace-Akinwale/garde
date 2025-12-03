@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { guidesAPI } from '@/lib/api';
+import ReminderModal from './ReminderModal';
 import {
   X,
   Edit,
@@ -15,6 +16,7 @@ import {
   TrendingUp,
   Share2,
   Video,
+  Bell,
 } from 'lucide-react';
 
 const typeIcons = {
@@ -25,12 +27,13 @@ const typeIcons = {
   unclear: FileQuestion,
 };
 
-export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) {
+export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpdated }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editedGuide, setEditedGuide] = useState({ ...guide });
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [copySuccess, setCopySuccess] = useState(true);
+  const [showReminderModal, setShowReminderModal] = useState(false);
 
   // Swipe-to-close state
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -268,14 +271,24 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           </div>
           <div className="flex items-center gap-2">
             {!editing && (
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                title="Share this recipe"
-              >
-                <Share2 size={20} />
-                <span className="hidden sm:inline">Share</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowReminderModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
+                  title="Set reminder"
+                >
+                  <Bell size={20} />
+                  <span className="hidden sm:inline">Remind Me</span>
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                  title="Share this recipe"
+                >
+                  <Share2 size={20} />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
+              </>
             )}
             {editing ? (
               <button
@@ -618,6 +631,17 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
           </div>
         </div>
       )}
+
+      {/* Reminder Modal */}
+      <ReminderModal
+        guide={guide}
+        userId={userId}
+        isOpen={showReminderModal}
+        onClose={() => setShowReminderModal(false)}
+        onSuccess={() => {
+          alert('Reminder set successfully!');
+        }}
+      />
     </div>
   );
 }
