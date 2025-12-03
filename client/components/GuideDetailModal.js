@@ -75,7 +75,8 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
     const diffY = currentY - touchStartY.current;
 
     // Only handle horizontal swipes (ignore vertical scrolling)
-    if (Math.abs(diffX) > Math.abs(diffY) && diffX > 0) {
+    // Support both directions: swipe right (diffX > 0) OR swipe left (diffX < 0)
+    if (Math.abs(diffX) > Math.abs(diffY)) {
       setIsSwiping(true);
       setSwipeOffset(diffX);
     }
@@ -88,8 +89,8 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
       return;
     }
 
-    // If swiped more than 40% of screen width, close modal
-    if (swipeOffset > window.innerWidth * 0.4) {
+    // If swiped more than 40% of screen width in EITHER direction, close modal
+    if (Math.abs(swipeOffset) > window.innerWidth * 0.4) {
       // Go back in history (will trigger popstate → onClose)
       window.history.back();
     } else {
