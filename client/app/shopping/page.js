@@ -242,6 +242,17 @@ export default function ShoppingPage() {
           />
         )}
       </div>
+      </div>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal
+          user={user}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdated={checkUser}
+        />
+      )}
     </div>
   );
 }
@@ -501,17 +512,6 @@ function ListDetailModal({ list, userRegion, onClose, onToggleItem, onAddItem, o
           </div>
         )}
       </div>
-      </div>
-
-      {/* Profile Modal */}
-      {showProfileModal && (
-        <ProfileModal
-          user={user}
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          onUpdated={checkUser}
-        />
-      )}
     </div>
   );
 }
