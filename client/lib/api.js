@@ -95,4 +95,54 @@ export const guidesAPI = {
   },
 };
 
+export const shoppingAPI = {
+  /**
+   * Get all shopping lists for a user
+   */
+  getAll: async (userId) => {
+    const response = await api.get(`/api/shopping/${userId}`);
+    return response.data;
+  },
+
+  /**
+   * Create new shopping list
+   */
+  create: async (userId, name, items = [], guideIds = []) => {
+    const response = await api.post('/api/shopping', { userId, name, items, guideIds });
+    return response.data;
+  },
+
+  /**
+   * Create shopping list from a guide's ingredients
+   */
+  createFromGuide: async (userId, guideId, listName = null) => {
+    const response = await api.post('/api/shopping/from-guide', { userId, guideId, listName });
+    return response.data;
+  },
+
+  /**
+   * Update shopping list
+   */
+  update: async (listId, updates) => {
+    const response = await api.patch(`/api/shopping/${listId}`, updates);
+    return response.data;
+  },
+
+  /**
+   * Delete shopping list
+   */
+  delete: async (listId) => {
+    const response = await api.delete(`/api/shopping/${listId}`);
+    return response.data;
+  },
+
+  /**
+   * Add a guide's ingredients to existing shopping list
+   */
+  addGuideToList: async (listId, guideId) => {
+    const response = await api.post(`/api/shopping/${listId}/guides/${guideId}`);
+    return response.data;
+  },
+};
+
 export default api;

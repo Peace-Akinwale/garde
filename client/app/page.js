@@ -249,6 +249,7 @@ export default function Home() {
               <GuideCard
                 key={guide.id}
                 guide={guide}
+                userId={user.id}
                 onDeleted={handleGuideDeleted}
               />
             ))}

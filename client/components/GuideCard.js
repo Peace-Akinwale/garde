@@ -13,8 +13,10 @@ import {
   Users,
   TrendingUp,
   Video,
+  ShoppingCart,
 } from 'lucide-react';
 import GuideDetailModal from './GuideDetailModal';
+import ShoppingListSelector from './ShoppingListSelector';
 
 // Utility function to format timestamps as relative time
 function formatTimeAgo(dateString) {
@@ -66,9 +68,10 @@ const difficultyColors = {
   hard: 'text-red-600',
 };
 
-export default function GuideCard({ guide, onDeleted }) {
+export default function GuideCard({ guide, onDeleted, userId }) {
   const [showDetail, setShowDetail] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showShoppingSelector, setShowShoppingSelector] = useState(false);
 
   const Icon = typeIcons[guide.type] || FileQuestion;
   const cardBorderColor = typeColors[guide.type] || typeColors.other;
@@ -120,14 +123,28 @@ export default function GuideCard({ guide, onDeleted }) {
               </div>
             )}
           </div>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
-            title="Delete guide"
-          >
-            <Trash2 size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            {guide.ingredients && guide.ingredients.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowShoppingSelector(true);
+                }}
+                className="text-gray-400 hover:text-primary-500 transition"
+                title="Add to shopping list"
+              >
+                <ShoppingCart size={16} />
+              </button>
+            )}
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
+              title="Delete guide"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Title */}
@@ -196,6 +213,16 @@ export default function GuideCard({ guide, onDeleted }) {
           isOpen={showDetail}
           onClose={() => setShowDetail(false)}
           onUpdated={onDeleted}
+        />
+      )}
+
+      {/* Shopping List Selector */}
+      {showShoppingSelector && (
+        <ShoppingListSelector
+          guide={guide}
+          userId={userId}
+          isOpen={showShoppingSelector}
+          onClose={() => setShowShoppingSelector(false)}
         />
       )}
     </>

@@ -11,6 +11,7 @@ import videoRoutes from './routes/video.js';
 import guideRoutes from './routes/guides.js';
 import webhookRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin.js';
+import shoppingRoutes from './routes/shopping.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,12 +75,14 @@ app.get('/', (req, res) => {
       video: '/api/video/*',
       guides: '/api/guides/*',
       webhooks: '/api/webhooks/*',
-      admin: '/api/admin/*'
+      admin: '/api/admin/*',
+      shopping: '/api/shopping/*'
     },
     features: [
       'User activity tracking',
       'Email notifications',
-      'Admin dashboard'
+      'Admin dashboard',
+      'Shopping lists with smart links'
     ],
     frontend: 'https://garde-tau.vercel.app'
   });
@@ -104,6 +107,7 @@ app.use('/api/video', videoRoutes);
 app.use('/api/guides', guideRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/shopping', shoppingRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
