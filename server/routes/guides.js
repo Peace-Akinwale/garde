@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabase } from '../index.js';
+import { trackActivity, ACTIVITY_TYPES } from '../services/analytics.js';
 
 const router = express.Router();
 
@@ -55,6 +56,7 @@ router.get('/:userId', async (req, res) => {
 router.get('/detail/:guideId', async (req, res) => {
   try {
     const { guideId } = req.params;
+    const { userId } = req.query; // Get userId from query params
 
     const { data, error } = await supabase
       .from('guides')
@@ -66,6 +68,14 @@ router.get('/detail/:guideId', async (req, res) => {
 
     if (!data) {
       return res.status(404).json({ error: 'Guide not found' });
+    }
+
+    // Track guide viewed activity
+    if (userId) {
+      await trackActivity(userId, ACTIVITY_TYPES.GUIDE_VIEWED, {
+        guide_id: guideId,
+        guide_title: data.title
+      });
     }
 
     res.json({
@@ -135,6 +145,13 @@ router.post('/', async (req, res) => {
 
     if (error) throw error;
 
+    // Track guide created activity
+    await trackActivity(userId, ACTIVITY_TYPES.GUIDE_CREATED, {
+      guide_id: data.id,
+      guide_title: title,
+      guide_type: type || 'howto'
+    });
+
     res.status(201).json({
       success: true,
       data,
@@ -157,9 +174,13 @@ router.patch('/:guideId', async (req, res) => {
     const { guideId } = req.params;
     const updateData = req.body;
 
+    // Extract userId before removing it
+    const userId = updateData.userId || updateData.user_id;
+
     // Remove fields that shouldn't be updated
     delete updateData.id;
     delete updateData.user_id;
+    delete updateData.userId;
     delete updateData.created_at;
 
     const { data, error } = await supabase
@@ -173,6 +194,14 @@ router.patch('/:guideId', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Track guide edited activity
+    if (userId) {
+      await trackActivity(userId, ACTIVITY_TYPES.GUIDE_EDITED, {
+        guide_id: guideId,
+        guide_title: data.title
+      });
+    }
 
     res.json({
       success: true,
@@ -194,6 +223,14 @@ router.patch('/:guideId', async (req, res) => {
 router.delete('/:guideId', async (req, res) => {
   try {
     const { guideId } = req.params;
+    const { userId } = req.query; // Get userId from query params
+
+    // Get guide title before deleting
+    const { data: guide } = await supabase
+      .from('guides')
+      .select('title, user_id')
+      .eq('id', guideId)
+      .single();
 
     const { error } = await supabase
       .from('guides')
@@ -201,6 +238,15 @@ router.delete('/:guideId', async (req, res) => {
       .eq('id', guideId);
 
     if (error) throw error;
+
+    // Track guide deleted activity
+    const userIdToTrack = userId || guide?.user_id;
+    if (userIdToTrack) {
+      await trackActivity(userIdToTrack, ACTIVITY_TYPES.GUIDE_DELETED, {
+        guide_id: guideId,
+        guide_title: guide?.title || 'Unknown'
+      });
+    }
 
     res.json({
       success: true,

@@ -9,6 +9,8 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import videoRoutes from './routes/video.js';
 import guideRoutes from './routes/guides.js';
+import webhookRoutes from './routes/webhooks.js';
+import adminRoutes from './routes/admin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,26 +66,44 @@ fs.mkdir(uploadsDir, { recursive: true }).catch(() => {
 app.get('/', (req, res) => {
   res.json({
     name: 'Garde API',
-    version: '1.0.0',
+    version: '1.1.0',
     status: 'running',
     message: 'Backend API for Garde - AI-powered recipe & guide extraction',
     endpoints: {
       health: '/health',
       video: '/api/video/*',
-      guides: '/api/guides/*'
+      guides: '/api/guides/*',
+      webhooks: '/api/webhooks/*',
+      admin: '/api/admin/*'
     },
+    features: [
+      'User activity tracking',
+      'Email notifications',
+      'Admin dashboard'
+    ],
     frontend: 'https://garde-tau.vercel.app'
   });
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Garde API is running' });
+  res.json({
+    status: 'ok',
+    message: 'Garde API is running',
+    timestamp: new Date().toISOString(),
+    features: {
+      emailNotifications: !!process.env.RESEND_API_KEY,
+      activityTracking: true,
+      adminDashboard: true
+    }
+  });
 });
 
 // Routes
 app.use('/api/video', videoRoutes);
 app.use('/api/guides', guideRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -98,4 +118,8 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Garde server running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV}`);
+  console.log(`✅ New features enabled: Activity tracking, Email notifications, Admin dashboard`);
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY not configured - email notifications disabled');
+  }
 });
