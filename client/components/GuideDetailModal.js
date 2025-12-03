@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { guidesAPI } from '@/lib/api';
 import {
   X,
@@ -32,7 +32,75 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [copySuccess, setCopySuccess] = useState(true);
 
+  // Swipe-to-close state
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const modalRef = useRef(null);
+
   const Icon = typeIcons[guide.type] || FileQuestion;
+
+  // Handle browser back button + history management
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Push state when modal opens
+    window.history.pushState({ modalOpen: true }, '');
+
+    const handlePopState = (e) => {
+      // When user presses back or swipes back, close the modal
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose]);
+
+  // Touch gesture handlers for swipe-to-close
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartX.current) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - touchStartX.current;
+    const diffY = currentY - touchStartY.current;
+
+    // Only handle horizontal swipes (ignore vertical scrolling)
+    if (Math.abs(diffX) > Math.abs(diffY) && diffX > 0) {
+      setIsSwiping(true);
+      setSwipeOffset(diffX);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isSwiping) {
+      touchStartX.current = 0;
+      touchStartY.current = 0;
+      return;
+    }
+
+    // If swiped more than 40% of screen width, close modal
+    if (swipeOffset > window.innerWidth * 0.4) {
+      // Go back in history (will trigger popstate → onClose)
+      window.history.back();
+    } else {
+      // Reset position
+      setSwipeOffset(0);
+    }
+
+    setIsSwiping(false);
+    touchStartX.current = 0;
+    touchStartY.current = 0;
+  };
 
   const handleSave = async () => {
     try {
@@ -154,9 +222,29 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
 
   if (!isOpen) return null;
 
+  // Calculate opacity for swipe animation
+  const swipeProgress = Math.min(swipeOffset / window.innerWidth, 1);
+  const opacity = 1 - swipeProgress * 0.5;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full my-8 relative">
+    <div
+      ref={modalRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-y-auto"
+      style={{
+        opacity: opacity,
+        transition: isSwiping ? 'none' : 'opacity 0.3s ease-out',
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div
+        className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full my-8 relative"
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.3s ease-out',
+        }}
+      >
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-600 rounded-t-xl p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">

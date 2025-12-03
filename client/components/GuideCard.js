@@ -15,7 +15,7 @@ import {
   Video,
   ShoppingCart,
 } from 'lucide-react';
-import GuideDetailModal from './GuideDetailModalNew';
+import GuideDetailModal from './GuideDetailModal';
 import ShoppingListSelector from './ShoppingListSelector';
 
 // Utility function to format timestamps as relative time
