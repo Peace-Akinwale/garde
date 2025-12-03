@@ -1,17 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { videoAPI, guidesAPI } from '@/lib/api';
-import { X, Link as LinkIcon, Upload, Loader } from 'lucide-react';
+import { X, Link as LinkIcon, Upload, Loader, CheckCircle, XCircle } from 'lucide-react';
 
 export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId }) {
   const [mode, setMode] = useState('url'); // 'url' or 'upload'
   const [url, setUrl] = useState('');
   const [file, setFile] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState('');
+  const [jobId, setJobId] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState('');
   const [error, setError] = useState(null);
-  const [abortController, setAbortController] = useState(null);
+  const [canClose, setCanClose] = useState(true);
+
+  const pollingIntervalRef = useRef(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
@@ -26,14 +39,100 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
     }
   };
 
+  /**
+   * Poll job status every 2 seconds until complete
+   */
+  const startPolling = (jobId) => {
+    // Initial check immediately
+    checkJobStatus(jobId);
+
+    // Then poll every 2 seconds
+    pollingIntervalRef.current = setInterval(() => {
+      checkJobStatus(jobId);
+    }, 2000);
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
+
+  const checkJobStatus = async (jobId) => {
+    try {
+      const response = await videoAPI.getJobStatus(jobId, userId);
+      const job = response.job;
+
+      setProgress(job.progress || 0);
+      setCurrentStep(job.currentStep || 'Processing...');
+
+      if (job.status === 'completed') {
+        stopPolling();
+        await handleJobCompleted(job);
+      } else if (job.status === 'failed') {
+        stopPolling();
+        handleJobFailed(job.error || 'Processing failed');
+      }
+    } catch (error) {
+      console.error('Error checking job status:', error);
+      // Don't stop polling on network errors - try again next interval
+    }
+  };
+
+  const handleJobCompleted = async (job) => {
+    try {
+      setCurrentStep('Saving guide...');
+
+      // Save the extracted guide to database
+      await guidesAPI.create({
+        userId,
+        title: job.guide.title,
+        type: job.guide.type,
+        category: job.guide.category,
+        language: job.guide.language || job.transcription?.language,
+        ingredients: job.guide.ingredients,
+        steps: job.guide.steps,
+        duration: job.guide.duration,
+        servings: job.guide.servings,
+        difficulty: job.guide.difficulty,
+        tips: job.guide.tips,
+        summary: job.guide.summary,
+        transcription: job.transcription?.text,
+        sourceUrl: mode === 'url' ? url : null,
+      });
+
+      setProgress(100);
+      setCurrentStep('Done!');
+      setCanClose(true);
+
+      setTimeout(() => {
+        onGuideAdded();
+        resetForm();
+      }, 1000);
+    } catch (error) {
+      console.error('Error saving guide:', error);
+      setError('Failed to save guide. Please try again.');
+      setProcessing(false);
+      setCanClose(true);
+    }
+  };
+
+  const handleJobFailed = (errorMessage) => {
+    setError(errorMessage);
+    setProcessing(false);
+    setProgress(0);
+    setCurrentStep('');
+    setCanClose(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setProcessing(true);
-
-    // Create AbortController for this request
-    const controller = new AbortController();
-    setAbortController(controller);
+    setProgress(0);
+    setCurrentStep('Submitting...');
+    setCanClose(false); // User can close even while processing
 
     try {
       let result;
@@ -45,8 +144,8 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           return;
         }
 
-        setProgress('Downloading video...');
-        result = await videoAPI.processUrl(url, userId, controller.signal);
+        setCurrentStep('Creating processing job...');
+        result = await videoAPI.processUrl(url, userId);
       } else {
         if (!file) {
           setError('Please select a video file');
@@ -54,60 +153,32 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           return;
         }
 
-        setProgress('Uploading video...');
-        result = await videoAPI.processUpload(file, userId, controller.signal);
+        setCurrentStep('Uploading file...');
+        result = await videoAPI.processUpload(file, userId);
       }
 
       if (!result.success) {
-        throw new Error('Failed to process video');
+        throw new Error('Failed to create processing job');
       }
 
-      setProgress('Extracting guide information...');
+      // Got job ID - start polling
+      setJobId(result.jobId);
+      setCurrentStep('Processing started...');
+      setCanClose(true); // User can now safely close the modal!
+      startPolling(result.jobId);
 
-      // Save the extracted guide to database
-      await guidesAPI.create({
-        userId,
-        title: result.data.guide.title,
-        type: result.data.guide.type,
-        category: result.data.guide.category,
-        language: result.data.guide.language || result.data.transcription.language,
-        ingredients: result.data.guide.ingredients,
-        steps: result.data.guide.steps,
-        duration: result.data.guide.duration,
-        servings: result.data.guide.servings,
-        difficulty: result.data.guide.difficulty,
-        tips: result.data.guide.tips,
-        summary: result.data.guide.summary,
-        transcription: result.data.transcription.text,
-        sourceUrl: mode === 'url' ? url : null,
-      });
-
-      setProgress('Done!');
-      setTimeout(() => {
-        onGuideAdded();
-        resetForm();
-      }, 500);
     } catch (error) {
-      // Check if the error was due to cancellation
-      if (error.name === 'AbortError' || error.message.includes('cancel')) {
-        console.log('Video processing cancelled by user');
-        setError(null); // Don't show error for user-initiated cancellation
-      } else {
-        console.error('Error processing video:', error);
-        setError(error.message || 'Failed to process video. Please try again.');
-      }
+      console.error('Error submitting video:', error);
+      setError(error.message || 'Failed to submit video. Please try again.');
       setProcessing(false);
-      setProgress('');
-      setAbortController(null);
+      setProgress(0);
+      setCurrentStep('');
+      setCanClose(true);
     }
   };
 
   const handleCancel = () => {
-    // Abort the ongoing request if there is one
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
-    }
+    stopPolling();
     resetForm();
     onClose();
   };
@@ -116,25 +187,27 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
     setUrl('');
     setFile(null);
     setProcessing(false);
-    setProgress('');
+    setJobId(null);
+    setProgress(0);
+    setCurrentStep('');
     setError(null);
-    setAbortController(null);
+    setCanClose(true);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 relative">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-lg w-full p-6 relative">
         <button
           onClick={handleCancel}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
-          title={processing ? "Cancel processing" : "Close"}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+          title="Close"
         >
           <X size={24} />
         </button>
 
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           Add New Guide
         </h2>
 
@@ -145,8 +218,8 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
             disabled={processing}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition ${
               mode === 'url'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-slate-600'
             } disabled:opacity-50`}
           >
             <LinkIcon size={20} />
@@ -157,8 +230,8 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
             disabled={processing}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition ${
               mode === 'upload'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-slate-600'
             } disabled:opacity-50`}
           >
             <Upload size={20} />
@@ -167,24 +240,46 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+            <XCircle size={20} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           </div>
         )}
 
-        {processing && progress && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Loader className="animate-spin text-blue-600" size={20} />
-              <p className="text-sm text-blue-600">{progress}</p>
+        {processing && (
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-center gap-3 mb-3">
+              {progress === 100 ? (
+                <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
+              ) : (
+                <Loader className="animate-spin text-blue-600 dark:text-blue-400" size={20} />
+              )}
+              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentStep}</p>
             </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-2">
+              <div
+                className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 text-right">{progress}%</p>
+
+            {canClose && progress < 100 && (
+              <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+                <p className="text-xs text-green-700 dark:text-green-400">
+                  ✓ You can safely close this modal or browse away - processing will continue in the background!
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           {mode === 'url' ? (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Video URL (TikTok, YouTube, Instagram, X/Twitter)
               </label>
               <input
@@ -192,23 +287,23 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://www.tiktok.com/@user/video/..."
-                className="w-full px-4 py-3 text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+                className="w-full px-4 py-3 text-gray-900 dark:text-white bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500"
                 disabled={processing}
                 required
               />
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Paste the link to the video containing the recipe or guide
               </p>
-              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-300">
                 <strong>Supported:</strong> TikTok, Instagram, X/Twitter, Facebook, YouTube, and 1000+ platforms
               </div>
             </div>
           ) : (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Upload Video File
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <div className="border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-6 text-center">
                 <input
                   type="file"
                   accept="video/*"
@@ -221,15 +316,15 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
                   htmlFor="video-upload"
                   className="cursor-pointer flex flex-col items-center"
                 >
-                  <Upload size={40} className="text-gray-400 mb-2" />
+                  <Upload size={40} className="text-gray-400 dark:text-gray-500 mb-2" />
                   {file ? (
-                    <p className="text-sm text-gray-700">{file.name}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{file.name}</p>
                   ) : (
                     <>
-                      <p className="text-sm text-gray-700 mb-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
                         Click to upload video
                       </p>
-                      <p className="text-xs text-gray-500">Max 100MB</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Max 100MB</p>
                     </>
                   )}
                 </label>
@@ -241,9 +336,9 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
             <button
               type="button"
               onClick={handleCancel}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+              className="flex-1 px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition"
             >
-              {processing ? 'Cancel Processing' : 'Cancel'}
+              Close
             </button>
             <button
               type="submit"
@@ -255,8 +350,8 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
           </div>
         </form>
 
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-xs text-blue-800">
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-xs text-blue-800 dark:text-blue-300">
             <strong>Note:</strong> The AI will automatically extract recipes and instructions
             from the video, including support for Yoruba and 98+ languages.
           </p>

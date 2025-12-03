@@ -11,20 +11,21 @@ const api = axios.create({
 
 export const videoAPI = {
   /**
-   * Process video from URL
+   * Submit video URL for background processing
+   * Returns immediately with job ID - user can close browser!
    */
-  processUrl: async (url, userId, signal = null) => {
+  processUrl: async (url, userId) => {
     const response = await api.post('/api/video/process-url', { url, userId }, {
-      signal,
-      timeout: 300000, // 5 minute timeout
+      timeout: 30000, // 30 second timeout (just for job creation)
     });
     return response.data;
   },
 
   /**
-   * Process uploaded video file
+   * Upload video file for background processing
+   * Returns immediately with job ID
    */
-  processUpload: async (file, userId, signal = null) => {
+  processUpload: async (file, userId) => {
     const formData = new FormData();
     formData.append('video', file);
     formData.append('userId', userId);
@@ -33,8 +34,28 @@ export const videoAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      signal,
-      timeout: 300000, // 5 minute timeout
+      timeout: 60000, // 60 second timeout (for file upload)
+    });
+    return response.data;
+  },
+
+  /**
+   * Get status of a processing job
+   * Poll this endpoint to check progress
+   */
+  getJobStatus: async (jobId, userId) => {
+    const response = await api.get(`/api/video/job/${jobId}?userId=${userId}`, {
+      timeout: 10000, // 10 second timeout
+    });
+    return response.data;
+  },
+
+  /**
+   * Get all jobs for a user (job history)
+   */
+  getUserJobs: async (userId, limit = 20, offset = 0) => {
+    const response = await api.get(`/api/video/jobs?userId=${userId}&limit=${limit}&offset=${offset}`, {
+      timeout: 10000,
     });
     return response.data;
   },

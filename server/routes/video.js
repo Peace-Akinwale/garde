@@ -1,12 +1,14 @@
 import express from 'express';
 import { upload } from '../config/multer.js';
-import { processVideo } from '../services/videoProcessor.js';
+import { processVideoJob, getJobStatus, getUserJobs } from '../services/jobProcessor.js';
+import { supabase } from '../index.js';
 
 const router = express.Router();
 
 /**
  * POST /api/video/process-url
- * Process video from URL (TikTok, YouTube, Instagram)
+ * Submit video URL for background processing
+ * Returns immediately with job ID - user can close browser!
  */
 router.post('/process-url', async (req, res) => {
   try {
@@ -20,18 +22,44 @@ router.post('/process-url', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log(`Processing video from URL: ${url}`);
+    console.log(`Creating background job for URL: ${url}`);
 
-    const result = await processVideo(url, false, userId);
+    // Create job record in database
+    const { data: job, error } = await supabase
+      .from('processing_jobs')
+      .insert({
+        user_id: userId,
+        job_type: 'video_url',
+        video_url: url,
+        status: 'pending',
+        progress: 0,
+        current_step: 'Queued...'
+      })
+      .select()
+      .single();
 
+    if (error) throw error;
+
+    // Start processing in background (DON'T WAIT!)
+    // This allows the response to return immediately
+    processVideoJob(job.id, url, false, userId).catch(err => {
+      console.error(`Background processing failed for job ${job.id}:`, err);
+    });
+
+    console.log(`Job ${job.id} created and processing started`);
+
+    // Return job ID immediately
     res.json({
       success: true,
-      data: result,
+      jobId: job.id,
+      message: 'Video processing started. You can close this page and come back later!',
+      status: 'pending'
     });
+
   } catch (error) {
-    console.error('Error processing video URL:', error);
+    console.error('Error creating video processing job:', error);
     res.status(500).json({
-      error: 'Failed to process video',
+      error: 'Failed to create processing job',
       message: error.message,
     });
   }
@@ -39,7 +67,8 @@ router.post('/process-url', async (req, res) => {
 
 /**
  * POST /api/video/process-upload
- * Process uploaded video file
+ * Upload and process video file in background
+ * Returns immediately with job ID
  */
 router.post('/process-upload', upload.single('video'), async (req, res) => {
   try {
@@ -53,18 +82,129 @@ router.post('/process-upload', upload.single('video'), async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log(`Processing uploaded video: ${req.file.originalname}`);
+    console.log(`Creating background job for uploaded file: ${req.file.originalname}`);
 
-    const result = await processVideo(req.file.path, true, userId);
+    // Create job record
+    const { data: job, error } = await supabase
+      .from('processing_jobs')
+      .insert({
+        user_id: userId,
+        job_type: 'video_upload',
+        video_file_path: req.file.path,
+        status: 'pending',
+        progress: 0,
+        current_step: 'Queued...',
+        metadata: {
+          originalFilename: req.file.originalname,
+          fileSize: req.file.size
+        }
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Start processing in background
+    processVideoJob(job.id, req.file.path, true, userId).catch(err => {
+      console.error(`Background processing failed for job ${job.id}:`, err);
+    });
+
+    console.log(`Job ${job.id} created for file upload`);
+
+    // Return immediately
+    res.json({
+      success: true,
+      jobId: job.id,
+      message: 'Video uploaded and processing started. You can close this page!',
+      status: 'pending'
+    });
+
+  } catch (error) {
+    console.error('Error creating upload processing job:', error);
+    res.status(500).json({
+      error: 'Failed to create processing job',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/video/job/:jobId
+ * Check status of a processing job
+ * Frontend polls this endpoint to get updates
+ */
+router.get('/job/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const job = await getJobStatus(jobId, userId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
 
     res.json({
       success: true,
-      data: result,
+      job: {
+        id: job.id,
+        status: job.status,
+        progress: job.progress,
+        currentStep: job.current_step,
+        transcription: job.transcription,
+        guide: job.guide,
+        error: job.error_message,
+        createdAt: job.created_at,
+        completedAt: job.completed_at
+      }
     });
+
   } catch (error) {
-    console.error('Error processing uploaded video:', error);
+    console.error('Error getting job status:', error);
     res.status(500).json({
-      error: 'Failed to process video',
+      error: 'Failed to get job status',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/video/jobs
+ * Get all jobs for a user (for job history UI)
+ */
+router.get('/jobs', async (req, res) => {
+  try {
+    const { userId, limit = 20, offset = 0 } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const jobs = await getUserJobs(userId, parseInt(limit), parseInt(offset));
+
+    res.json({
+      success: true,
+      jobs: jobs.map(job => ({
+        id: job.id,
+        status: job.status,
+        progress: job.progress,
+        currentStep: job.current_step,
+        jobType: job.job_type,
+        videoUrl: job.video_url,
+        createdAt: job.created_at,
+        completedAt: job.completed_at,
+        guide: job.guide
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error getting user jobs:', error);
+    res.status(500).json({
+      error: 'Failed to get jobs',
       message: error.message,
     });
   }
