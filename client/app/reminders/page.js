@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { remindersAPI } from '@/lib/api';
 import { Bell, Clock, Trash2, Mail, Smartphone, ChefHat, Hammer, Book, FileQuestion } from 'lucide-react';
 import Navigation from '@/components/Navigation';
+import ProfileModal from '@/components/ProfileModal';
 
 const typeIcons = {
   recipe: ChefHat,
@@ -19,6 +20,7 @@ export default function RemindersPage() {
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -61,6 +63,10 @@ export default function RemindersPage() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const handleProfileClick = () => {
+    setShowProfileModal(true);
   };
 
   const formatDateTime = (dateString) => {
@@ -109,7 +115,7 @@ export default function RemindersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex">
-      <Navigation user={user} onLogout={() => supabase.auth.signOut()} />
+      <Navigation user={user} onLogout={() => supabase.auth.signOut()} onProfileClick={handleProfileClick} />
 
       <div className="flex-1 flex flex-col lg:ml-0">
         <div className="lg:hidden h-16" />
@@ -257,6 +263,16 @@ export default function RemindersPage() {
           )}
         </div>
       </div>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal
+          user={user}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdated={checkUser}
+        />
+      )}
     </div>
   );
 }

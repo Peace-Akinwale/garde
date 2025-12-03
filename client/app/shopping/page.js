@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { shoppingAPI } from '@/lib/api';
 import { ShoppingCart, Plus, Trash2, Copy, Check, ExternalLink, Edit2, X } from 'lucide-react';
 import { generateAllStoreLinks, detectUserRegion, REGIONS, getStoresForRegion } from '@/lib/smartLinks';
+import Navigation from '@/components/Navigation';
+import ProfileModal from '@/components/ProfileModal';
 
 // Use built-in crypto.randomUUID() instead of uuid package
 const generateId = () => crypto.randomUUID();
@@ -15,6 +17,7 @@ export default function ShoppingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedList, setSelectedList] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [userRegion, setUserRegion] = useState(REGIONS.USA);
 
   useEffect(() => {
@@ -137,6 +140,10 @@ export default function ShoppingPage() {
     alert('Shopping list copied to clipboard!');
   };
 
+  const handleProfileClick = () => {
+    setShowProfileModal(true);
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-900">
@@ -146,8 +153,13 @@ export default function ShoppingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4 lg:p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex">
+      <Navigation user={user} onLogout={() => supabase.auth.signOut()} onProfileClick={handleProfileClick} />
+
+      <div className="flex-1 flex flex-col lg:ml-0">
+        <div className="lg:hidden h-16" />
+
+        <div className="max-w-6xl mx-auto p-4 lg:p-8 w-full">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
@@ -489,6 +501,17 @@ function ListDetailModal({ list, userRegion, onClose, onToggleItem, onAddItem, o
           </div>
         )}
       </div>
+      </div>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal
+          user={user}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdated={checkUser}
+        />
+      )}
     </div>
   );
 }

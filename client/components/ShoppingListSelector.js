@@ -1,59 +1,98 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { shoppingAPI } from '@/lib/api';
 import { X, Plus, ShoppingCart } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
+import Toast from './Toast';
+
+// Cache shopping lists to avoid refetching
+let listsCache = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 30000; // 30 seconds
 
 export default function ShoppingListSelector({ isOpen, onClose, guide, userId }) {
   const [lists, setLists] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(null);
   const [creating, setCreating] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const { toasts, showToast, removeToast } = useToast();
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen && userId) {
+    if (isOpen && userId && !loadedRef.current) {
       loadLists();
+      loadedRef.current = true;
+    }
+    if (!isOpen) {
+      loadedRef.current = false;
     }
   }, [isOpen, userId]);
 
   const loadLists = async () => {
     try {
+      // Check cache first
+      const now = Date.now();
+      if (listsCache && (now - cacheTimestamp) < CACHE_DURATION) {
+        setLists(listsCache);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       const response = await shoppingAPI.getAll(userId);
-      setLists(response.data || []);
+      const data = response.data || [];
+      setLists(data);
+
+      // Update cache
+      listsCache = data;
+      cacheTimestamp = now;
     } catch (error) {
       console.error('Error loading lists:', error);
+      showToast('Failed to load shopping lists', 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  const invalidateCache = () => {
+    listsCache = null;
+    cacheTimestamp = 0;
+  };
+
   const handleCreateAndAdd = async () => {
     if (!newListName.trim()) return;
 
+    const listName = newListName.trim();
+    setCreating(true);
+
     try {
-      setCreating(true);
-      const listName = newListName.trim();
       await shoppingAPI.createFromGuide(userId, guide.id, listName);
-      alert(`Added to "${listName}"!`);
-      onClose();
+      invalidateCache(); // Clear cache so next load gets fresh data
+      showToast(`Added ${guide.ingredients?.length || 0} items to "${listName}"`, 'success');
+      setTimeout(onClose, 500); // Small delay to show toast
     } catch (error) {
       console.error('Error creating list:', error);
-      alert('Failed to create shopping list');
+      showToast('Failed to create shopping list', 'error');
     } finally {
       setCreating(false);
     }
   };
 
   const handleAddToList = async (list) => {
+    setAdding(list.id);
+
     try {
       await shoppingAPI.addGuideToList(list.id, guide.id);
-      alert(`Added to "${list.name}"!`);
-      onClose();
+      invalidateCache(); // Clear cache
+      showToast(`Added ${guide.ingredients?.length || 0} items to "${list.name}"`, 'success');
+      setTimeout(onClose, 500); // Small delay to show toast
     } catch (error) {
       console.error('Error adding to list:', error);
-      alert('Failed to add to shopping list');
+      showToast('Failed to add to shopping list', 'error');
+      setAdding(null);
     }
   };
 
@@ -97,7 +136,8 @@ export default function ShoppingListSelector({ isOpen, onClose, guide, userId })
                       <button
                         key={list.id}
                         onClick={() => handleAddToList(list)}
-                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition text-left"
+                        disabled={adding === list.id}
+                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-3">
                           <ShoppingCart size={18} className="text-primary-500" />
@@ -163,6 +203,17 @@ export default function ShoppingListSelector({ isOpen, onClose, guide, userId })
           )}
         </div>
       </div>
+
+      {/* Toast Notifications */}
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
     </div>
   );
 }

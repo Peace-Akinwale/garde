@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { remindersAPI } from '@/lib/api';
 import { X, Bell, Mail, Smartphone, Calendar } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
+import Toast from './Toast';
 
 export default function ReminderModal({ guide, userId, isOpen, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
@@ -12,12 +14,13 @@ export default function ReminderModal({ guide, userId, isOpen, onClose, onSucces
     reminderType: 'both',
     message: ''
   });
+  const { toasts, showToast, removeToast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!reminderData.date || !reminderData.time) {
-      alert('Please select date and time');
+      showToast('Please select date and time', 'error');
       return;
     }
 
@@ -36,11 +39,12 @@ export default function ReminderModal({ guide, userId, isOpen, onClose, onSucces
         reminderData.message || null
       );
 
+      showToast('Reminder set successfully!', 'success');
       onSuccess?.();
-      onClose();
+      setTimeout(onClose, 500); // Small delay to show toast
     } catch (error) {
       console.error('Error creating reminder:', error);
-      alert('Failed to create reminder');
+      showToast('Failed to create reminder', 'error');
     } finally {
       setSaving(false);
     }
@@ -197,6 +201,17 @@ export default function ReminderModal({ guide, userId, isOpen, onClose, onSucces
           </div>
         </form>
       </div>
+
+      {/* Toast Notifications */}
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
     </div>
   );
 }
