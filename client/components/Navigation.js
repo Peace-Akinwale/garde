@@ -34,7 +34,7 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
   const baseMenuItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: ShoppingCart, label: 'Shopping Lists', path: '/shopping' },
-    { icon: Bell, label: 'Reminders', path: '/reminders' },
+    // { icon: Bell, label: 'Reminders', path: '/reminders' }, // Disabled for now
     { icon: User, label: 'Profile', path: '/profile' }
   ];
 

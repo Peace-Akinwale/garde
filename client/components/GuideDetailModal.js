@@ -272,6 +272,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
           <div className="flex items-center gap-2">
             {!editing && (
               <>
+                {/* Remind Me button - Disabled for now
                 <button
                   onClick={() => setShowReminderModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
@@ -280,6 +281,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
                   <Bell size={20} />
                   <span className="hidden sm:inline">Remind Me</span>
                 </button>
+                */}
                 <button
                   onClick={handleShare}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"

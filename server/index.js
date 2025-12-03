@@ -152,7 +152,7 @@ app.listen(PORT, () => {
     console.warn('⚠️  VAPID keys not configured - push notifications disabled');
   }
 
-  // Always start reminder scheduler (it will skip push if VAPID not configured)
-  startReminderScheduler();
-  console.log('✅ Reminder scheduler started');
+  // Reminder scheduler - Disabled for now
+  // startReminderScheduler();
+  // console.log('✅ Reminder scheduler started');
 });
