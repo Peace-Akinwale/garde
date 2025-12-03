@@ -15,7 +15,7 @@ import {
   Video,
   ShoppingCart,
 } from 'lucide-react';
-import GuideDetailModal from './GuideDetailModal';
+import GuideDetailModal from './GuideDetailModalNew';
 import ShoppingListSelector from './ShoppingListSelector';
 
 // Utility function to format timestamps as relative time
@@ -123,28 +123,14 @@ export default function GuideCard({ guide, onDeleted, userId }) {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {guide.ingredients && guide.ingredients.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowShoppingSelector(true);
-                }}
-                className="text-gray-400 hover:text-primary-500 transition"
-                title="Add to shopping list"
-              >
-                <ShoppingCart size={16} />
-              </button>
-            )}
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
-              title="Delete guide"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
+            title="Delete guide"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
 
         {/* Title */}

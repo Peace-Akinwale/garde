@@ -142,7 +142,7 @@ export default function AdminDashboard() {
 
         {/* Analytics Cards */}
         {dashboard && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <AnalyticsCard
               title="Total Users"
               value={dashboard.totalUsers || 0}
@@ -160,12 +160,6 @@ export default function AdminDashboard() {
               value={dashboard.totalGuides || 0}
               icon={FileText}
               color="purple"
-            />
-            <AnalyticsCard
-              title="Videos Processed"
-              value={dashboard.totalVideosProcessed || 0}
-              icon={Video}
-              color="orange"
             />
           </div>
         )}
