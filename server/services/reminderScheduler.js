@@ -8,20 +8,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Configure web-push with VAPID keys
-webpush.setVapidDetails(
-  `mailto:${process.env.ADMIN_EMAIL}`,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+// Configure web-push with VAPID keys (if available)
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    `mailto:${process.env.ADMIN_EMAIL}`,
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 /**
  * Send push notification to user
  */
 async function sendPushNotification(userId, title, message, url) {
   try {
+    // Skip if VAPID keys not configured
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      console.log('Push notifications not configured, skipping');
+      return;
+    }
+
     // Get user's push subscriptions
-    const { data: subscriptions, error } = await supabase
+    const { data: subscriptions, error} = await supabase
       .from('push_subscriptions')
       .select('subscription_data')
       .eq('user_id', userId);

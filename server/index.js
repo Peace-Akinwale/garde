@@ -126,13 +126,15 @@ app.listen(PORT, () => {
   console.log(`🚀 Garde server running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV}`);
   console.log(`✅ New features enabled: Activity tracking, Email notifications, Admin dashboard, Shopping lists, Reminders`);
+  // Check notification configuration
   if (!process.env.RESEND_API_KEY) {
     console.warn('⚠️  RESEND_API_KEY not configured - email notifications disabled');
   }
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
     console.warn('⚠️  VAPID keys not configured - push notifications disabled');
-  } else {
-    // Start reminder scheduler
-    startReminderScheduler();
   }
+
+  // Always start reminder scheduler (it will skip push if VAPID not configured)
+  startReminderScheduler();
+  console.log('✅ Reminder scheduler started');
 });
