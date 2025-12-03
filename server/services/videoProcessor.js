@@ -220,45 +220,71 @@ async function downloadWithYtDlp(url, outputPath) {
     // TikTok-specific options to avoid blocks and hangs
     const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
 
-    let baseOptions = '-f "best[ext=mp4]/best" --no-playlist --no-warnings -o';
+    let baseOptions, timeout;
 
     if (isTikTok) {
-      // TikTok-specific options to prevent hanging
-      baseOptions = '--no-check-certificate --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -f "best[ext=mp4]/best" --no-playlist --no-warnings -o';
-      console.log('Applying TikTok-specific download options');
+      // TikTok-specific options with more aggressive settings
+      baseOptions = '--no-check-certificate --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --extractor-retries 3 --fragment-retries 3 -f "best[ext=mp4]/best" --no-playlist -o';
+      timeout = 120000; // 2 minutes for TikTok (they're slower)
+      console.log('Applying TikTok-specific download options (120s timeout, 3 retries)');
+    } else {
+      baseOptions = '-f "best[ext=mp4]/best" --no-playlist -o';
+      timeout = 90000; // 90 seconds for other platforms
     }
 
     const command = `"${ytDlpPath}" ${baseOptions} "${outputPath}" "${url}"`;
 
-    console.log('Executing yt-dlp with 90 second timeout');
+    console.log('Executing yt-dlp...');
+    console.log('Command:', command);
 
-    // Use a more aggressive timeout with kill signal
+    // Execute with timeout
     const { stdout, stderr } = await execPromise(command, {
-      timeout: 90000, // 90 second timeout
-      killSignal: 'SIGKILL', // Force kill if timeout
+      timeout,
+      killSignal: 'SIGKILL',
     });
 
-    if (stderr && !stderr.includes('WARNING')) {
-      console.warn('yt-dlp stderr:', stderr);
-    }
+    // Log all output for debugging
+    if (stdout) console.log('yt-dlp stdout:', stdout.substring(0, 500));
+    if (stderr) console.log('yt-dlp stderr:', stderr.substring(0, 500));
 
     // Verify file was downloaded
-    const stats = await fsPromises.stat(outputPath);
-    if (stats.size === 0) {
-      throw new Error('Downloaded file is empty');
+    try {
+      const stats = await fsPromises.stat(outputPath);
+      if (stats.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
+      console.log(`✓ yt-dlp download complete: ${stats.size} bytes`);
+      return outputPath;
+    } catch (statError) {
+      throw new Error('Video file was not created - download may have failed silently');
     }
 
-    console.log(`yt-dlp download complete: ${stats.size} bytes`);
-    return outputPath;
   } catch (error) {
-    console.error('yt-dlp error:', error);
+    console.error('yt-dlp failed:', {
+      message: error.message,
+      killed: error.killed,
+      signal: error.signal,
+      code: error.code,
+      stderr: error.stderr?.substring(0, 500),
+      stdout: error.stdout?.substring(0, 500)
+    });
 
-    // Provide more helpful error messages
-    if (error.killed || error.message.includes('timeout')) {
-      throw new Error('Download timeout - the video source may be slow or blocked. Please try downloading the video to your device and using "Upload File" instead.');
+    // Provide specific error messages
+    if (error.killed || error.signal === 'SIGKILL') {
+      throw new Error('Download timeout - TikTok/video source is blocking or too slow. Please download the video to your device and use "Upload File" instead.');
     }
 
-    throw new Error(`Failed to download with yt-dlp: ${error.message}`);
+    if (error.stderr && error.stderr.includes('429')) {
+      throw new Error('Too many requests - TikTok has rate-limited this server. Please try again in a few minutes or use "Upload File".');
+    }
+
+    if (error.stderr && error.stderr.includes('403')) {
+      throw new Error('Access forbidden - TikTok is blocking downloads from this server. Please use "Upload File" instead.');
+    }
+
+    // Generic error with actual message
+    const errorMsg = error.stderr || error.message || 'Unknown error';
+    throw new Error(`Download failed: ${errorMsg.substring(0, 200)}`);
   }
 }
 
