@@ -8,6 +8,8 @@ import AddGuideModal from '@/components/AddGuideModal';
 import SearchBar from '@/components/SearchBar';
 import AuthModal from '@/components/AuthModal';
 import NotificationsModal from '@/components/NotificationsModal';
+import Navigation from '@/components/Navigation';
+import ProfileModal from '@/components/ProfileModal';
 import { Plus, LogOut, User, Moon, Sun, Bell } from 'lucide-react';
 
 export default function Home() {
@@ -17,6 +19,7 @@ export default function Home() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [hasUnseenNotifications, setHasUnseenNotifications] = useState(true);
   const [filters, setFilters] = useState({
@@ -122,6 +125,18 @@ export default function Home() {
     localStorage.setItem('seenNotifications', 'true');
   };
 
+  const handleProfileClick = () => {
+    setShowProfileModal(true);
+  };
+
+  const handleProfileUpdated = async () => {
+    // Refresh user data after profile update
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    setUser(session?.user ?? null);
+  };
+
   if (!user) {
     return (
       <AuthModal
@@ -132,9 +147,21 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex">
+      {/* Navigation */}
+      <Navigation
+        user={user}
+        onLogout={handleLogout}
+        onProfileClick={handleProfileClick}
+      />
+
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col lg:ml-0">
+        {/* Mobile top padding for fixed menu button */}
+        <div className="lg:hidden h-16" />
+
+        {/* Header */}
+        <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-16 lg:top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -168,13 +195,6 @@ export default function Home() {
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-              <button
-                onClick={handleLogout}
-                className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
-                title="Logout"
-              >
-                <LogOut size={20} />
               </button>
             </div>
           </div>
@@ -251,6 +271,16 @@ export default function Home() {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
+
+      {/* Profile Modal */}
+      <ProfileModal
+        user={user}
+        supabase={supabase}
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onUpdated={handleProfileUpdated}
+      />
+      </div>
     </div>
   );
 }
