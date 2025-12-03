@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { guidesAPI } from '@/lib/api';
 import GuideCard from '@/components/GuideCard';
@@ -27,6 +27,13 @@ export default function Home() {
     type: 'all',
     category: '',
   });
+
+  // Double-swipe to exit state
+  const [showExitToast, setShowExitToast] = useState(false);
+  const [swipeAttempts, setSwipeAttempts] = useState(0);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const exitTimerRef = useRef(null);
 
   useEffect(() => {
     // Load dark mode preference from localStorage
@@ -137,6 +144,58 @@ export default function Home() {
     setUser(session?.user ?? null);
   };
 
+  // Double-swipe to exit handlers
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartX.current) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchEndX - touchStartX.current;
+    const diffY = touchEndY - touchStartY.current;
+
+    // Check if it's a horizontal swipe (left or right)
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      // Horizontal swipe detected
+      if (swipeAttempts === 0) {
+        // First swipe - show toast
+        setSwipeAttempts(1);
+        setShowExitToast(true);
+
+        // Reset after 3 seconds
+        if (exitTimerRef.current) {
+          clearTimeout(exitTimerRef.current);
+        }
+        exitTimerRef.current = setTimeout(() => {
+          setSwipeAttempts(0);
+          setShowExitToast(false);
+        }, 3000);
+      } else if (swipeAttempts === 1) {
+        // Second swipe within time window - exit
+        if (exitTimerRef.current) {
+          clearTimeout(exitTimerRef.current);
+        }
+        window.history.back(); // Exit app
+      }
+    }
+
+    touchStartX.current = 0;
+    touchStartY.current = 0;
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (exitTimerRef.current) {
+        clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, []);
+
   if (!user) {
     return (
       <AuthModal
@@ -147,7 +206,11 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex">
+    <div
+      className="min-h-screen bg-gray-50 dark:bg-slate-900 flex"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Navigation */}
       <Navigation
         user={user}
@@ -281,6 +344,18 @@ export default function Home() {
         onClose={() => setShowProfileModal(false)}
         onUpdated={handleProfileUpdated}
       />
+
+      {/* Exit Toast - Double Swipe to Exit */}
+      {showExitToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-slideUp">
+          <div className="bg-gray-900 dark:bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span className="font-medium">Swipe again to exit</span>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
