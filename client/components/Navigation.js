@@ -69,9 +69,12 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
           )}
         </button>
 
-        <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+        <button
+          onClick={() => router.push('/')}
+          className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent hover:opacity-80 transition"
+        >
           Garde
-        </h1>
+        </button>
 
         <div className="w-10" /> {/* Spacer for centering */}
       </div>
@@ -80,9 +83,12 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
       <aside className="hidden lg:flex flex-col w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 h-screen sticky top-0">
         {/* Logo & User Info */}
         <div className="p-6 border-b border-gray-200 dark:border-slate-700">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent mb-4">
+          <button
+            onClick={() => router.push('/')}
+            className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent mb-4 hover:opacity-80 transition"
+          >
             Garde
-          </h1>
+          </button>
 
           {user && (
             <button
@@ -156,9 +162,15 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
             {/* Mobile Menu Header */}
             <div className="p-6 border-b border-gray-200 dark:border-slate-700">
               <div className="flex items-center justify-between mb-4">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+                <button
+                  onClick={() => {
+                    router.push('/');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent hover:opacity-80 transition"
+                >
                   Garde
-                </h1>
+                </button>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition"
