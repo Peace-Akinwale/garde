@@ -34,6 +34,7 @@ export default function Home() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const exitTimerRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
     // Load dark mode preference from localStorage
@@ -162,22 +163,32 @@ export default function Home() {
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
       // Horizontal swipe detected
       if (swipeAttempts === 0) {
-        // First swipe - show toast
+        // First swipe - show toast for 1 second
         setSwipeAttempts(1);
         setShowExitToast(true);
 
-        // Reset after 3 seconds
+        // Hide toast after 1 second
+        if (toastTimerRef.current) {
+          clearTimeout(toastTimerRef.current);
+        }
+        toastTimerRef.current = setTimeout(() => {
+          setShowExitToast(false);
+        }, 1000);
+
+        // Reset swipe counter after 3 seconds
         if (exitTimerRef.current) {
           clearTimeout(exitTimerRef.current);
         }
         exitTimerRef.current = setTimeout(() => {
           setSwipeAttempts(0);
-          setShowExitToast(false);
         }, 3000);
       } else if (swipeAttempts === 1) {
         // Second swipe within time window - exit
         if (exitTimerRef.current) {
           clearTimeout(exitTimerRef.current);
+        }
+        if (toastTimerRef.current) {
+          clearTimeout(toastTimerRef.current);
         }
         window.history.back(); // Exit app
       }
@@ -187,11 +198,14 @@ export default function Home() {
     touchStartY.current = 0;
   };
 
-  // Cleanup timer on unmount
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (exitTimerRef.current) {
         clearTimeout(exitTimerRef.current);
+      }
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
       }
     };
   }, []);
