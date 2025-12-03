@@ -97,7 +97,7 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
           count: numFrames,
           folder: framesDir,
           filename: 'frame-%i.jpg',
-          size: '640x480'
+          size: '480x360' // Reduced from 640x480 to save memory on Render free tier
         });
     });
   } catch (error) {
@@ -489,8 +489,17 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 4: ALWAYS extract frames and analyze visually
       // This captures text overlays, ingredients shown on screen, and cooking techniques
       console.log('Extracting frames for visual analysis (in addition to audio)...');
-      const framePaths = await extractVideoFrames(videoPath, tempDir, 8); // Increased to 8 frames for better coverage
+      const framePaths = await extractVideoFrames(videoPath, tempDir, 5); // Reduced to 5 frames to fit in 512MB RAM
       const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
+
+      // Clean up frames immediately after analysis to free memory
+      for (const framePath of framePaths) {
+        try {
+          await fsPromises.unlink(framePath);
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+      }
 
       // CASE 2B: Silent or minimal speech video
       if (!transcription.text || transcription.text.trim().length < 50) {

@@ -181,13 +181,25 @@ export default function GuideCard({ guide, onDeleted, userId }) {
           )}
         </div>
 
-        {/* Ingredients Count */}
+        {/* Ingredients Count & Shopping Cart Button */}
         {guide.ingredients && guide.ingredients.length > 0 && (
-          <div className="text-xs text-gray-500">
-            {guide.ingredients.length} ingredient{guide.ingredients.length !== 1 ? 's' : ''}
-            {guide.steps && guide.steps.length > 0 && (
-              <span> • {guide.steps.length} step{guide.steps.length !== 1 ? 's' : ''}</span>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-500">
+              {guide.ingredients.length} ingredient{guide.ingredients.length !== 1 ? 's' : ''}
+              {guide.steps && guide.steps.length > 0 && (
+                <span> • {guide.steps.length} step{guide.steps.length !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowShoppingSelector(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-lg transition"
+            >
+              <ShoppingCart size={14} />
+              Add to List
+            </button>
           </div>
         )}
 
