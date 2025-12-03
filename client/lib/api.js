@@ -145,4 +145,63 @@ export const shoppingAPI = {
   },
 };
 
+export const adminAPI = {
+  /**
+   * Get admin dashboard analytics
+   */
+  getDashboard: async (userId) => {
+    const response = await api.get('/api/admin/dashboard', {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get all users with engagement data
+   */
+  getUsers: async (userId, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.offset) params.append('offset', filters.offset);
+
+    const response = await api.get(`/api/admin/users?${params.toString()}`, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user activity history
+   */
+  getUserActivity: async (userId, targetUserId, limit = 100) => {
+    const response = await api.get(`/api/admin/activity/${targetUserId}?limit=${limit}`, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get recent sign-ups
+   */
+  getSignups: async (userId, limit = 20) => {
+    const response = await api.get(`/api/admin/signups?limit=${limit}`, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get detailed user info
+   */
+  getUserDetails: async (userId, targetUserId) => {
+    const response = await api.get(`/api/admin/user/${targetUserId}`, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+};
+
 export default api;

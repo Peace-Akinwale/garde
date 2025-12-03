@@ -1,20 +1,47 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, ShoppingCart, User, Bell, Menu, X, Settings, LogOut } from 'lucide-react';
+import { Home, ShoppingCart, User, Bell, Menu, X, Settings, LogOut, Shield } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function Navigation({ user, onLogout, onProfileClick }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  const menuItems = [
+  useEffect(() => {
+    checkAdminStatus();
+  }, [user]);
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
+
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+
+      setIsAdmin(data?.is_admin || false);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+    }
+  };
+
+  const baseMenuItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: ShoppingCart, label: 'Shopping Lists', path: '/shopping' },
     { icon: Bell, label: 'Reminders', path: '/reminders' },
     { icon: User, label: 'Profile', path: '/profile' }
   ];
+
+  // Add Admin menu item if user is admin
+  const menuItems = isAdmin
+    ? [...baseMenuItems, { icon: Shield, label: 'Admin', path: '/admin' }]
+    : baseMenuItems;
 
   const isActive = (path) => pathname === path;
 
