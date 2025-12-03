@@ -123,15 +123,45 @@ async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
       const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
 
       const prompt = isPhotoCarousel
-        ? 'This is an image from a recipe or cooking tutorial carousel/slideshow. Please read and extract ALL visible text, ingredients, measurements, and instructions. Be thorough and capture every detail you see.'
-        : `This is a frame from a cooking/recipe video. Please analyze and extract:
-1. ANY TEXT ON SCREEN (recipe names, ingredients, measurements, instructions, captions, overlays)
-2. Visible ingredients or materials with quantities if shown
-3. Cooking actions or techniques being demonstrated
-4. Tools or equipment being used
-5. Any visual cues about the cooking process
+        ? `This is an image from a recipe or cooking tutorial carousel/slideshow.
 
-Be extremely thorough with text extraction - even small text or partially visible text is important. If you see text, transcribe it exactly as written.`;
+EXTRACT EVERYTHING:
+1. **ALL VISIBLE TEXT**: Recipe names, ingredients lists, measurements, instructions, captions, overlays, labels - transcribe EXACTLY as written
+2. **Ingredients shown**: What ingredients/materials are visible? Include quantities if shown on screen
+3. **Steps/Instructions**: Any numbered steps or procedural text
+4. **Visual elements**: Colors, textures, preparation stages
+
+Be EXTREMELY thorough. If text is partially visible, include what you can read. Small text matters. Numbers matter. Every word counts.`
+        : `This is a frame from a cooking/recipe/craft video. Extract EVERYTHING visible:
+
+1. **TEXT ON SCREEN** (HIGHEST PRIORITY):
+   - Recipe/project names
+   - Ingredient lists with measurements
+   - Step-by-step instructions
+   - Captions, subtitles, overlays
+   - Any text visible on packages, containers, or labels
+   - Transcribe ALL text EXACTLY as written, even if partial
+
+2. **Visible Ingredients/Materials**:
+   - What items are shown? (raw ingredients, materials, tools)
+   - Quantities if visible (cups, tablespoons, grams, pieces)
+   - Preparation state (chopped, whole, mixed, etc.)
+
+3. **Actions/Techniques Being Demonstrated**:
+   - What is the person doing? (stirring, cutting, assembling, mixing)
+   - Specific techniques shown (kneading, folding, whisking, etc.)
+
+4. **Tools/Equipment**:
+   - Cooking equipment (pots, pans, bowls, utensils)
+   - Appliances (mixer, blender, oven)
+   - Craft tools if applicable
+
+5. **Visual Context**:
+   - Stage of recipe/project (beginning, middle, final product)
+   - Colors, textures, consistency
+   - Visual cues about temperature, timing, or doneness
+
+Be EXHAUSTIVE with text extraction - even tiny text or partially visible text is critical. Every ingredient name, measurement, and instruction matters.`;
 
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',
@@ -187,12 +217,25 @@ async function downloadWithYtDlp(url, outputPath) {
   try {
     console.log('Using yt-dlp to download:', url);
 
-    // yt-dlp command with options
-    const command = `"${ytDlpPath}" -f "best[ext=mp4]/best" --no-playlist --quiet --no-warnings -o "${outputPath}" "${url}"`;
+    // TikTok-specific options to avoid blocks and hangs
+    const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
 
-    console.log('Executing yt-dlp:', command);
+    let baseOptions = '-f "best[ext=mp4]/best" --no-playlist --no-warnings -o';
+
+    if (isTikTok) {
+      // TikTok-specific options to prevent hanging
+      baseOptions = '--no-check-certificate --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -f "best[ext=mp4]/best" --no-playlist --no-warnings -o';
+      console.log('Applying TikTok-specific download options');
+    }
+
+    const command = `"${ytDlpPath}" ${baseOptions} "${outputPath}" "${url}"`;
+
+    console.log('Executing yt-dlp with 90 second timeout');
+
+    // Use a more aggressive timeout with kill signal
     const { stdout, stderr } = await execPromise(command, {
-      timeout: 120000, // 2 minute timeout
+      timeout: 90000, // 90 second timeout
+      killSignal: 'SIGKILL', // Force kill if timeout
     });
 
     if (stderr && !stderr.includes('WARNING')) {
@@ -209,6 +252,12 @@ async function downloadWithYtDlp(url, outputPath) {
     return outputPath;
   } catch (error) {
     console.error('yt-dlp error:', error);
+
+    // Provide more helpful error messages
+    if (error.killed || error.message.includes('timeout')) {
+      throw new Error('Download timeout - the video source may be slow or blocked. Please try downloading the video to your device and using "Upload File" instead.');
+    }
+
     throw new Error(`Failed to download with yt-dlp: ${error.message}`);
   }
 }
@@ -393,12 +442,32 @@ IMPORTANT INSTRUCTIONS:
 `;
     }
 
-    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions.
+    const prompt = `You are an expert at extracting structured how-to guides and recipes from video transcriptions. Your goal is ACCURACY and COMPLETENESS.
 
-The following is a transcription of a video:
+The following is a transcription of a video (may include both audio and visual content):
 
 "${transcriptionText}"
 ${languageInstructions}
+
+CRITICAL EXTRACTION RULES:
+1. **Ingredients/Materials**: Extract EVERY ingredient/material mentioned, even if quantities aren't specified. Include:
+   - Ingredients mentioned in speech
+   - Ingredients shown on screen (from visual analysis)
+   - Partial mentions (e.g., "add some salt" → include "salt")
+   - Common sense ingredients (if making bread and flour is shown, include it)
+
+2. **Steps**: Create clear, actionable steps. Each step should:
+   - Start with an action verb (Mix, Chop, Heat, Add, etc.)
+   - Include quantities when mentioned
+   - Be specific about technique when demonstrated
+   - Combine related micro-actions into logical steps
+   - Number sequentially (Step 1, Step 2, etc.)
+
+3. **Title**: Create a descriptive, specific title (e.g., "Nigerian Jollof Rice", "Chocolate Chip Cookies", "Handmade Soap Bar")
+
+4. **Category**: Be as specific as possible (e.g., "West African cuisine", "Italian pasta dishes", "Natural skincare")
+
+5. **Tips**: Extract ALL tips, warnings, substitutions, or additional notes mentioned
 
 Please analyze this transcription and extract a structured guide. Determine if this is:
 1. A cooking recipe
@@ -412,9 +481,9 @@ Return a JSON object with this structure:
   "type": "recipe|craft|howto|other",
   "category": "specific category (e.g., Nigerian cuisine, soap making, woodworking)",
   "language": "detected primary language (use 'yo' for Yoruba, 'en' for English)",
-  "ingredients": ["list", "of", "ingredients or materials"],
+  "ingredients": ["list", "of", "ingredients or materials with quantities when mentioned"],
   "steps": [
-    "Step 1: Clear instruction",
+    "Step 1: Clear, actionable instruction",
     "Step 2: Next instruction",
     "..."
   ],
@@ -427,11 +496,11 @@ Return a JSON object with this structure:
 
 If the transcription doesn't contain a clear guide or recipe, set type to "unclear" and provide what you can extract.
 
-IMPORTANT: Return ONLY the JSON object, no additional text.`;
+IMPORTANT: Return ONLY the JSON object, no additional text. Be thorough - don't skip ingredients or steps just because they seem obvious.`;
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 3000, // Increased for complex recipes with many ingredients/steps
       messages: [
         {
           role: 'user',
