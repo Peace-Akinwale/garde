@@ -13,7 +13,7 @@ import webhookRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin.js';
 import shoppingRoutes from './routes/shopping.js';
 import remindersRoutes from './routes/reminders.js';
-import { startReminderScheduler } from './services/reminderScheduler.js';
+import { startReminderScheduler, checkReminders } from './services/reminderScheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,6 +111,24 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/shopping', shoppingRoutes);
 app.use('/api/reminders', remindersRoutes);
+
+// Test endpoint to manually trigger reminder check
+app.get('/api/test/check-reminders', async (req, res) => {
+  try {
+    console.log('📋 Manual reminder check triggered');
+    await checkReminders();
+    res.json({
+      success: true,
+      message: 'Reminder check completed. Check server logs for details.'
+    });
+  } catch (error) {
+    console.error('Error in manual reminder check:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

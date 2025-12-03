@@ -189,4 +189,4 @@ function startReminderScheduler() {
   console.log('Reminder scheduler started successfully');
 }
 
-export { startReminderScheduler, sendPushNotification };
+export { startReminderScheduler, sendPushNotification, checkReminders };
