@@ -12,6 +12,8 @@ import guideRoutes from './routes/guides.js';
 import webhookRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin.js';
 import shoppingRoutes from './routes/shopping.js';
+import remindersRoutes from './routes/reminders.js';
+import { startReminderScheduler } from './services/reminderScheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -108,6 +110,7 @@ app.use('/api/guides', guideRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/shopping', shoppingRoutes);
+app.use('/api/reminders', remindersRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -122,8 +125,14 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Garde server running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV}`);
-  console.log(`✅ New features enabled: Activity tracking, Email notifications, Admin dashboard`);
+  console.log(`✅ New features enabled: Activity tracking, Email notifications, Admin dashboard, Shopping lists, Reminders`);
   if (!process.env.RESEND_API_KEY) {
     console.warn('⚠️  RESEND_API_KEY not configured - email notifications disabled');
+  }
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    console.warn('⚠️  VAPID keys not configured - push notifications disabled');
+  } else {
+    // Start reminder scheduler
+    startReminderScheduler();
   }
 });
