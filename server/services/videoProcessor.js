@@ -97,7 +97,7 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
           count: numFrames,
           folder: framesDir,
           filename: 'frame-%i.jpg',
-          size: '480x360' // Reduced from 640x480 to save memory on Render free tier
+          size: '640x480' // Full quality extraction
         });
     });
   } catch (error) {
@@ -108,6 +108,7 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
 
 /**
  * Analyze images using OpenAI Vision API
+ * Memory optimized: processes and deletes each frame immediately
  */
 async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
   try {
@@ -153,6 +154,14 @@ Be extremely thorough with text extraction - even small text or partially visibl
       });
 
       imageAnalyses.push(response.choices[0].message.content);
+
+      // CRITICAL: Delete frame immediately after analysis to free memory
+      try {
+        await fsPromises.unlink(imagePath);
+        console.log(`Frame ${imagePaths.indexOf(imagePath) + 1}/${imagePaths.length} analyzed and deleted`);
+      } catch (unlinkError) {
+        console.warn('Failed to delete frame:', unlinkError);
+      }
     }
 
     // Combine all analyses
@@ -489,17 +498,9 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 4: ALWAYS extract frames and analyze visually
       // This captures text overlays, ingredients shown on screen, and cooking techniques
       console.log('Extracting frames for visual analysis (in addition to audio)...');
-      const framePaths = await extractVideoFrames(videoPath, tempDir, 5); // Reduced to 5 frames to fit in 512MB RAM
+      const framePaths = await extractVideoFrames(videoPath, tempDir, 8); // Full quality: 8 frames
       const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
-
-      // Clean up frames immediately after analysis to free memory
-      for (const framePath of framePaths) {
-        try {
-          await fsPromises.unlink(framePath);
-        } catch (err) {
-          // Ignore cleanup errors
-        }
-      }
+      // Note: Frames are deleted inside analyzeImagesWithVision() to optimize memory
 
       // CASE 2B: Silent or minimal speech video
       if (!transcription.text || transcription.text.trim().length < 50) {
