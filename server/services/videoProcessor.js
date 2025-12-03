@@ -123,7 +123,14 @@ async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
 
       const prompt = isPhotoCarousel
         ? 'This is an image from a recipe or cooking tutorial carousel/slideshow. Please read and extract ALL visible text, ingredients, measurements, and instructions. Be thorough and capture every detail you see.'
-        : 'This is a frame from a cooking video. Describe what cooking action is being performed, what ingredients or tools are visible, and any text on screen. Be specific about the cooking technique.';
+        : `This is a frame from a cooking/recipe video. Please analyze and extract:
+1. ANY TEXT ON SCREEN (recipe names, ingredients, measurements, instructions, captions, overlays)
+2. Visible ingredients or materials with quantities if shown
+3. Cooking actions or techniques being demonstrated
+4. Tools or equipment being used
+5. Any visual cues about the cooking process
+
+Be extremely thorough with text extraction - even small text or partially visible text is important. If you see text, transcribe it exactly as written.`;
 
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',
@@ -479,20 +486,30 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 3: Transcribe audio with Whisper
       transcription = await transcribeAudio(audioPath);
 
-      // CASE 2B: Silent or music-only video (no meaningful speech)
-      // If transcription is very short or empty, use Vision API
+      // Step 4: ALWAYS extract frames and analyze visually
+      // This captures text overlays, ingredients shown on screen, and cooking techniques
+      console.log('Extracting frames for visual analysis (in addition to audio)...');
+      const framePaths = await extractVideoFrames(videoPath, tempDir, 8); // Increased to 8 frames for better coverage
+      const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
+
+      // CASE 2B: Silent or minimal speech video
       if (!transcription.text || transcription.text.trim().length < 50) {
-        console.log('Minimal or no speech detected - using Vision API for visual analysis');
+        console.log('Minimal speech detected - using primarily visual analysis');
         contentType = 'silent_video';
 
-        const framePaths = await extractVideoFrames(videoPath, tempDir);
-        const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
-
-        // Combine with any audio transcription (might be music lyrics or short words)
         transcription.text = transcription.text
           ? `Audio: ${transcription.text}\n\nVisual Analysis:\n${visionAnalysis.text}`
           : visionAnalysis.text;
         transcription.source = 'vision_and_audio';
+      }
+      // CASE 2C: Video with both audio and visual content (most common)
+      else {
+        console.log('Combining audio transcription with visual analysis');
+        contentType = 'video_with_visual';
+
+        // Combine audio and visual - vision second so it supplements what was said
+        transcription.text = `Audio Transcription:\n${transcription.text}\n\nVisual Content (text on screen, ingredients shown, techniques demonstrated):\n${visionAnalysis.text}`;
+        transcription.source = 'audio_and_vision';
       }
     }
 

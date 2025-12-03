@@ -25,7 +25,7 @@ export default function AuthModal({ isOpen, onClose }) {
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -35,6 +35,25 @@ export default function AuthModal({ isOpen, onClose }) {
           },
         });
         if (error) throw error;
+
+        // Send sign-up notification to admin
+        if (data?.user) {
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://garde-backend.onrender.com';
+            await fetch(`${apiUrl}/api/webhooks/user-signup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: data.user.id,
+                email: email,
+                full_name: fullName
+              })
+            });
+          } catch (notifError) {
+            console.error('Failed to send signup notification:', notifError);
+            // Don't block user signup if notification fails
+          }
+        }
       }
 
       onClose();
