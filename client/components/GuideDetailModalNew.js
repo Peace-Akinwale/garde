@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { guidesAPI } from '@/lib/api';
 import {
   X,
@@ -34,7 +34,77 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
   const [editedGuide, setEditedGuide] = useState({ ...guide });
   const [showCopyToast, setShowCopyToast] = useState(false);
 
+  // Swipe-to-close state
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const modalRef = useRef(null);
+
   const Icon = typeIcons[guide.type] || FileQuestion;
+
+  // Handle browser back button + history management
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Push state when modal opens
+    window.history.pushState({ modalOpen: true }, '');
+
+    const handlePopState = (e) => {
+      // When user presses back or swipes back, close the modal
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose]);
+
+  // Touch gesture handlers for swipe-to-close
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartX.current) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - touchStartX.current;
+    const diffY = currentY - touchStartY.current;
+
+    // Only handle horizontal swipes (ignore vertical scrolling)
+    if (Math.abs(diffX) > Math.abs(diffY) && diffX > 0) {
+      setIsSwiping(true);
+      setSwipeOffset(diffX);
+      // Prevent scrolling while swiping horizontally
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isSwiping) {
+      touchStartX.current = 0;
+      touchStartY.current = 0;
+      return;
+    }
+
+    // If swiped more than 40% of screen width, close modal
+    if (swipeOffset > window.innerWidth * 0.4) {
+      // Go back in history (will trigger popstate → onClose)
+      window.history.back();
+    } else {
+      // Reset position
+      setSwipeOffset(0);
+    }
+
+    setIsSwiping(false);
+    touchStartX.current = 0;
+    touchStartY.current = 0;
+  };
 
   const handleSave = async () => {
     try {
@@ -83,8 +153,23 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
 
   if (!isOpen) return null;
 
+  // Calculate opacity and scale for swipe animation
+  const swipeProgress = Math.min(swipeOffset / window.innerWidth, 1);
+  const opacity = 1 - swipeProgress * 0.3;
+
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-slate-900 animate-fadeIn">
+    <div
+      ref={modalRef}
+      className="fixed inset-0 z-50 bg-white dark:bg-slate-900"
+      style={{
+        transform: `translateX(${swipeOffset}px)`,
+        opacity: opacity,
+        transition: isSwiping ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out',
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header - Fixed */}
       <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-slate-800">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -128,7 +213,8 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
       </div>
 
       {/* Content - Scrollable */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
+      <div className="h-[calc(100vh-64px)] overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
         {/* Title Section */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
@@ -173,19 +259,51 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
                 <span className="text-sm font-medium capitalize">{guide.difficulty}</span>
               </div>
             )}
-            {guide.source_url && (
-              <a
-                href={guide.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:underline"
-              >
-                <Video size={20} />
-                <span className="text-sm font-medium">Watch Video</span>
-              </a>
-            )}
           </div>
         )}
+
+        {/* Prominent Video Button - Dominant Design */}
+        {guide.source_url && (() => {
+          const isTikTok = guide.source_url.includes('tiktok.com');
+          const isInstagram = guide.source_url.includes('instagram.com');
+          const isTwitter = guide.source_url.includes('twitter.com') || guide.source_url.includes('x.com');
+          const isYouTube = guide.source_url.includes('youtube.com') || guide.source_url.includes('youtu.be');
+          const canEmbed = !isTikTok && !isInstagram && !isTwitter;
+
+          return (
+            <div className="mb-12">
+              {canEmbed ? (
+                <div className="relative rounded-lg overflow-hidden bg-black aspect-video shadow-xl">
+                  <iframe
+                    src={isYouTube
+                      ? guide.source_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
+                      : guide.source_url}
+                    className="w-full h-full"
+                    allowFullScreen
+                    title="Original video"
+                  />
+                </div>
+              ) : (
+                <a
+                  href={guide.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center justify-center gap-3 p-6 ${
+                    isTwitter
+                      ? 'bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700'
+                      : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
+                  } text-white rounded-xl transition-all shadow-2xl hover:shadow-3xl transform hover:scale-[1.02]`}
+                >
+                  <Video size={28} />
+                  <div className="text-left">
+                    <p className="font-bold text-lg">Watch on {isTwitter ? 'X' : isTikTok ? 'TikTok' : 'Instagram'}</p>
+                    <p className="text-sm text-white/90">Click to open original video</p>
+                  </div>
+                </a>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Summary */}
         {guide.summary && (
@@ -318,6 +436,7 @@ export default function GuideDetailModal({ guide, isOpen, onClose, onUpdated }) 
             </ul>
           </div>
         )}
+        </div>
       </div>
 
       {/* Toast */}
