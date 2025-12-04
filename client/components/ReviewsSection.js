@@ -2,20 +2,36 @@
 import { useState, useEffect } from 'react';
 import { Star, MessageSquare, Image as ImageIcon, X, Send, Loader, CheckCircle, AlertCircle, Share2 } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
 export default function ReviewsSection() {
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({ totalReviews: 0, averageRating: 0 });
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [user, setUser] = useState(null);
 
   const supabase = createClientComponentClient();
+  const router = useRouter();
 
   useEffect(() => {
     fetchReviews();
     checkUser();
+
+    // Listen for auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, 'User:', session?.user?.email);
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const fetchReviews = async () => {
@@ -31,8 +47,21 @@ export default function ReviewsSection() {
   };
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error getting session:', error);
+        setUser(null);
+        setAuthLoading(false);
+        return;
+      }
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    } catch (error) {
+      console.error('Error checking user:', error);
+      setUser(null);
+      setAuthLoading(false);
+    }
   };
 
   const renderStars = (rating, size = 'w-5 h-5') => {
@@ -67,7 +96,12 @@ export default function ReviewsSection() {
           </div>
         )}
 
-        {user ? (
+        {authLoading ? (
+          <div className="flex items-center justify-center gap-2">
+            <Loader className="animate-spin w-5 h-5 text-indigo-600" />
+            <span className="text-gray-600 dark:text-gray-400">Loading...</span>
+          </div>
+        ) : user ? (
           <button
             onClick={() => setShowReviewModal(true)}
             className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition font-medium"
@@ -75,9 +109,17 @@ export default function ReviewsSection() {
             Write a Review
           </button>
         ) : (
-          <p className="text-gray-600 dark:text-gray-400">
-            Please sign in to leave a review
-          </p>
+          <div className="space-y-2">
+            <p className="text-gray-600 dark:text-gray-400">
+              Sign in to leave a review
+            </p>
+            <button
+              onClick={() => router.push('/')}
+              className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 transition font-medium text-sm"
+            >
+              Go to Home & Sign In
+            </button>
+          </div>
         )}
       </div>
 
