@@ -163,18 +163,20 @@ Be EXHAUSTIVE with text extraction - even tiny text or partially visible text is
 async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
   try {
     const frameCount = imagePaths.length;
-    const BATCH_SIZE = 1; // Process 1 frame at a time (safe for 512MB RAM limit)
-    console.log(`🚀 Analyzing ${frameCount} images with Vision API (sequential processing)...`);
+    const BATCH_SIZE = 4; // Process 4 frames at a time (optimized for 2GB RAM Standard tier)
+    console.log(`🚀 Analyzing ${frameCount} images with Vision API (batches of ${BATCH_SIZE})...`);
     const startTime = Date.now();
 
     const allAnalyses = [];
 
-    // Process frames in batches to prevent memory exhaustion on free tier
+    // Process frames in batches for optimal speed without exhausting memory
     for (let batchStart = 0; batchStart < frameCount; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, frameCount);
       const batchPaths = imagePaths.slice(batchStart, batchEnd);
 
-      console.log(`📦 Processing frame ${batchStart + 1}/${frameCount}...`);
+      const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(frameCount / BATCH_SIZE);
+      console.log(`📦 Processing batch ${batchNum}/${totalBatches} (frames ${batchStart + 1}-${batchEnd})...`);
 
       // Process this batch in parallel
       const batchAnalyses = await Promise.all(
