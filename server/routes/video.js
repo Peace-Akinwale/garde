@@ -22,7 +22,69 @@ router.post('/process-url', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log(`Creating background job for URL: ${url}`);
+    console.log(`📥 Processing request for URL: ${url}`);
+
+    // 🚀 CACHE CHECK: See if ANY user has already processed this exact URL
+    console.log('🔍 Checking cache for existing guide...');
+    const { data: existingGuide, error: cacheCheckError } = await supabase
+      .from('guides')
+      .select('id, title, type, category, ingredients, steps, transcription, language, duration, servings, difficulty, tips, summary')
+      .eq('source_url', url)
+      .limit(1)
+      .maybeSingle();
+
+    if (cacheCheckError) {
+      console.warn('Cache check failed:', cacheCheckError);
+      // Continue with normal processing if cache check fails
+    }
+
+    if (existingGuide) {
+      console.log(`✅ CACHE HIT! Found existing guide (ID: ${existingGuide.id})`);
+      console.log(`📋 Cloning guide for user ${userId}...`);
+
+      // Clone the guide for this user (instant result!)
+      const { data: clonedGuide, error: cloneError } = await supabase
+        .from('guides')
+        .insert({
+          user_id: userId,
+          title: existingGuide.title,
+          type: existingGuide.type,
+          category: existingGuide.category,
+          ingredients: existingGuide.ingredients,
+          steps: existingGuide.steps,
+          transcription: existingGuide.transcription,
+          source_url: url,
+          source_type: 'url',
+          language: existingGuide.language,
+          duration: existingGuide.duration,
+          servings: existingGuide.servings,
+          difficulty: existingGuide.difficulty,
+          tips: existingGuide.tips,
+          summary: existingGuide.summary
+        })
+        .select()
+        .single();
+
+      if (cloneError) {
+        console.error('Failed to clone guide:', cloneError);
+        // Fall through to normal processing
+      } else {
+        // Return cached result immediately (< 1 second response!)
+        console.log(`🎉 Cache hit! Guide cloned successfully in < 1 second`);
+        return res.json({
+          success: true,
+          cached: true,
+          guide: clonedGuide,
+          message: 'This video was already processed - instant result!',
+          transcription: {
+            text: existingGuide.transcription,
+            language: existingGuide.language
+          }
+        });
+      }
+    }
+
+    console.log('❌ Cache miss - processing video from scratch...');
 
     // Create job record in database
     const { data: job, error } = await supabase

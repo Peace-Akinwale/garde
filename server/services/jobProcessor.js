@@ -1,5 +1,7 @@
 import { supabase } from '../index.js';
 import { processVideo } from './videoProcessor.js';
+import fsPromises from 'fs/promises';
+import fs from 'fs';
 
 /**
  * Update job status in database
@@ -69,6 +71,19 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
     });
 
     console.log(`✓ Job ${jobId} completed - ${result.guide.title || 'Guide'}`);
+
+    // CLEANUP: Delete original uploaded file if it was a file upload
+    if (isFile && videoSource) {
+      try {
+        if (fs.existsSync(videoSource)) {
+          await fsPromises.unlink(videoSource);
+          console.log(`🗑️ Cleaned up uploaded file: ${videoSource}`);
+        }
+      } catch (cleanupError) {
+        console.warn(`⚠️ Failed to delete uploaded file: ${cleanupError.message}`);
+      }
+    }
+
     return result;
 
   } catch (error) {
@@ -82,6 +97,18 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
       current_step: 'Failed',
       error_message: error.message
     });
+
+    // CLEANUP: Delete original uploaded file even on failure
+    if (isFile && videoSource) {
+      try {
+        if (fs.existsSync(videoSource)) {
+          await fsPromises.unlink(videoSource);
+          console.log(`🗑️ Cleaned up uploaded file after error: ${videoSource}`);
+        }
+      } catch (cleanupError) {
+        console.warn(`⚠️ Failed to delete uploaded file: ${cleanupError.message}`);
+      }
+    }
 
     throw error;
   }

@@ -107,102 +107,136 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
 }
 
 /**
- * Analyze images using OpenAI Vision API
- * Memory optimized: processes and deletes each frame immediately
+ * Get Vision API prompt based on content type (domain-agnostic for all tutorials)
+ */
+function getVisionPrompt(frameIndex, totalFrames, isPhotoCarousel = false) {
+  if (isPhotoCarousel) {
+    return `This is an image from a tutorial carousel/slideshow (could be cooking, DIY, crafts, beauty, etc.).
+
+EXTRACT EVERYTHING:
+1. **ALL VISIBLE TEXT**: Titles, ingredient/material lists, measurements, instructions, captions, overlays, labels - transcribe EXACTLY as written
+2. **Items shown**: What ingredients/materials/tools are visible? Include quantities if shown on screen
+3. **Steps/Instructions**: Any numbered steps or procedural text
+4. **Visual elements**: Colors, textures, stages of completion
+
+Be EXTREMELY thorough. If text is partially visible, include what you can read. Small text matters. Numbers matter. Every word counts.`;
+  }
+
+  return `This is frame ${frameIndex + 1} of ${totalFrames} from a how-to/tutorial video (cooking, DIY, crafts, beauty, gardening, sewing, etc.). Extract EVERYTHING visible:
+
+1. **TEXT ON SCREEN** (HIGHEST PRIORITY):
+   - Tutorial/project/recipe names
+   - Ingredient/material lists with measurements or quantities
+   - Step-by-step instructions
+   - Captions, subtitles, overlays, annotations
+   - Any text visible on packages, containers, labels, or tools
+   - Transcribe ALL text EXACTLY as written, even if partial
+
+2. **Visible Items**:
+   - What ingredients/materials/supplies are shown?
+   - Quantities if visible (cups, grams, pieces, dimensions)
+   - Current state (raw, processed, assembled, mixed, cut, etc.)
+
+3. **Actions/Techniques Being Demonstrated**:
+   - What is the person doing? (mixing, cutting, assembling, sewing, painting, drilling, etc.)
+   - Specific techniques shown (kneading, folding, gluing, stitching, sanding, etc.)
+
+4. **Tools/Equipment**:
+   - Kitchen equipment (if cooking: pots, pans, utensils, appliances)
+   - Craft/DIY tools (if crafting: scissors, glue gun, sewing machine, drill, saw, brushes, etc.)
+   - Beauty tools (if beauty: brushes, applicators, etc.)
+
+5. **Visual Context**:
+   - Stage of project (beginning, middle, final product)
+   - Colors, textures, consistency, dimensions
+   - Visual cues about timing, temperature, or completion
+
+Be EXHAUSTIVE with text extraction - even tiny text or partially visible text is critical. Every item name, measurement, and instruction matters.`;
+}
+
+/**
+ * Analyze images using OpenAI Vision API - PARALLEL + HYBRID DETAIL MODE
+ * OPTIMIZED: Processes all frames simultaneously with adaptive detail levels
+ * First 3 frames use high detail (catch all materials/ingredients)
+ * Remaining frames use low detail (faster, cheaper for process steps)
  */
 async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
   try {
-    console.log(`Analyzing ${imagePaths.length} images with Vision API...`);
+    const frameCount = imagePaths.length;
+    console.log(`🚀 Analyzing ${frameCount} images with Vision API in PARALLEL...`);
+    const startTime = Date.now();
 
-    const imageAnalyses = [];
+    // Process ALL frames simultaneously with hybrid detail levels
+    const analyses = await Promise.all(
+      imagePaths.map(async (imagePath, index) => {
+        try {
+          // Read image
+          const imageBuffer = await fsPromises.readFile(imagePath);
+          const base64Image = imageBuffer.toString('base64');
+          const ext = path.extname(imagePath).toLowerCase();
+          const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
 
-    for (const imagePath of imagePaths) {
-      const imageBuffer = await fsPromises.readFile(imagePath);
-      const base64Image = imageBuffer.toString('base64');
-      const ext = path.extname(imagePath).toLowerCase();
-      const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+          // HYBRID DETAIL: First 3 frames = high detail (materials/ingredients)
+          // Remaining frames = low detail (process steps are easier to see)
+          const detailLevel = index < 3 ? 'high' : 'low';
+          const prompt = getVisionPrompt(index, frameCount, isPhotoCarousel);
 
-      const prompt = isPhotoCarousel
-        ? `This is an image from a recipe or cooking tutorial carousel/slideshow.
-
-EXTRACT EVERYTHING:
-1. **ALL VISIBLE TEXT**: Recipe names, ingredients lists, measurements, instructions, captions, overlays, labels - transcribe EXACTLY as written
-2. **Ingredients shown**: What ingredients/materials are visible? Include quantities if shown on screen
-3. **Steps/Instructions**: Any numbered steps or procedural text
-4. **Visual elements**: Colors, textures, preparation stages
-
-Be EXTREMELY thorough. If text is partially visible, include what you can read. Small text matters. Numbers matter. Every word counts.`
-        : `This is a frame from a cooking/recipe/craft video. Extract EVERYTHING visible:
-
-1. **TEXT ON SCREEN** (HIGHEST PRIORITY):
-   - Recipe/project names
-   - Ingredient lists with measurements
-   - Step-by-step instructions
-   - Captions, subtitles, overlays
-   - Any text visible on packages, containers, or labels
-   - Transcribe ALL text EXACTLY as written, even if partial
-
-2. **Visible Ingredients/Materials**:
-   - What items are shown? (raw ingredients, materials, tools)
-   - Quantities if visible (cups, tablespoons, grams, pieces)
-   - Preparation state (chopped, whole, mixed, etc.)
-
-3. **Actions/Techniques Being Demonstrated**:
-   - What is the person doing? (stirring, cutting, assembling, mixing)
-   - Specific techniques shown (kneading, folding, whisking, etc.)
-
-4. **Tools/Equipment**:
-   - Cooking equipment (pots, pans, bowls, utensils)
-   - Appliances (mixer, blender, oven)
-   - Craft tools if applicable
-
-5. **Visual Context**:
-   - Stage of recipe/project (beginning, middle, final product)
-   - Colors, textures, consistency
-   - Visual cues about temperature, timing, or doneness
-
-Be EXHAUSTIVE with text extraction - even tiny text or partially visible text is critical. Every ingredient name, measurement, and instruction matters.`;
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
+          // Call Vision API
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
               {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${mimeType};base64,${base64Image}`,
-                  detail: 'high'
-                }
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${mimeType};base64,${base64Image}`,
+                      detail: detailLevel
+                    }
+                  }
+                ]
               }
-            ]
+            ],
+            max_tokens: 500
+          });
+
+          const analysis = response.choices[0].message.content;
+
+          // Delete frame immediately after analysis to free memory
+          try {
+            await fsPromises.unlink(imagePath);
+            console.log(`✅ Frame ${index + 1}/${frameCount} (${detailLevel} detail) analyzed and deleted`);
+          } catch (unlinkError) {
+            console.warn(`⚠️ Failed to delete frame ${index + 1}:`, unlinkError.message);
           }
-        ],
-        max_tokens: 500
-      });
 
-      imageAnalyses.push(response.choices[0].message.content);
+          return { index, analysis, detailLevel };
+        } catch (frameError) {
+          console.error(`❌ Error analyzing frame ${index + 1}:`, frameError.message);
+          // Return partial result rather than failing entire batch
+          return { index, analysis: `[Frame ${index + 1} analysis failed]`, detailLevel: 'error' };
+        }
+      })
+    );
 
-      // CRITICAL: Delete frame immediately after analysis to free memory
-      try {
-        await fsPromises.unlink(imagePath);
-        console.log(`Frame ${imagePaths.indexOf(imagePath) + 1}/${imagePaths.length} analyzed and deleted`);
-      } catch (unlinkError) {
-        console.warn('Failed to delete frame:', unlinkError);
-      }
-    }
+    // Sort by index to maintain frame order
+    analyses.sort((a, b) => a.index - b.index);
 
     // Combine all analyses
-    const combinedText = imageAnalyses.join('\n\n---\n\n');
-    console.log('Vision analysis complete');
+    const combinedText = analyses.map(a => a.analysis).join('\n\n---\n\n');
+
+    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`⚡ All ${frameCount} frames analyzed in ${elapsedTime}s (${(elapsedTime / frameCount).toFixed(1)}s avg per frame)`);
 
     return {
       text: combinedText,
       language: 'en', // Vision API returns English descriptions
       duration: null,
-      source: isPhotoCarousel ? 'photo_carousel' : 'video_frames'
+      source: isPhotoCarousel ? 'photo_carousel' : 'video_frames',
+      processingTime: parseFloat(elapsedTime),
+      frameCount
     };
   } catch (error) {
     console.error('Vision API error:', error);
@@ -551,6 +585,140 @@ IMPORTANT: Return ONLY the JSON object, no additional text. Be thorough - don't 
 }
 
 /**
+ * Check if transcription contains instructional content (vs storytelling/music)
+ * Works for ALL tutorial types: cooking, DIY, crafts, beauty, gardening, sewing, etc.
+ */
+function hasInstructionalContent(transcription) {
+  const text = transcription.text.toLowerCase();
+  const words = text.split(/\s+/);
+
+  // Comprehensive keyword lists for ALL tutorial types
+  const instructionalKeywords = {
+    // Action verbs (cooking + DIY + crafts + beauty + gardening)
+    actions: [
+      // Cooking
+      'add', 'mix', 'stir', 'pour', 'cut', 'chop', 'slice', 'dice', 'mince',
+      'cook', 'bake', 'boil', 'fry', 'sauté', 'simmer', 'roast', 'grill',
+      'blend', 'fold', 'whisk', 'knead', 'measure', 'combine', 'heat',
+      // DIY/Building
+      'attach', 'screw', 'nail', 'glue', 'drill', 'sand', 'paint', 'cut',
+      'assemble', 'build', 'construct', 'fasten', 'secure', 'mount', 'install',
+      'measure', 'mark', 'clamp', 'hammer', 'saw', 'file', 'plane',
+      // Sewing/Crafts
+      'sew', 'stitch', 'thread', 'hem', 'pin', 'fold', 'press', 'iron',
+      'cut', 'trace', 'pattern', 'seam', 'backstitch', 'baste', 'gather',
+      // Beauty/Skincare
+      'apply', 'blend', 'dab', 'pat', 'massage', 'cleanse', 'exfoliate',
+      'moisturize', 'contour', 'highlight', 'brush', 'stroke',
+      // Gardening
+      'plant', 'water', 'prune', 'trim', 'fertilize', 'dig', 'transplant',
+      'mulch', 'weed', 'harvest', 'sow', 'compost'
+    ],
+
+    // Measurements & quantities (all domains)
+    measurements: [
+      // Cooking
+      'cup', 'cups', 'tablespoon', 'teaspoon', 'tsp', 'tbsp', 'ounce', 'oz',
+      'gram', 'grams', 'kg', 'kilogram', 'pound', 'lb', 'liter', 'ml',
+      'pinch', 'dash', 'handful', 'piece', 'pieces',
+      // DIY/Building
+      'inch', 'inches', 'foot', 'feet', 'cm', 'centimeter', 'meter', 'mm',
+      'millimeter', 'yard', 'length', 'width', 'height', 'diameter',
+      // General
+      'half', 'quarter', 'double', 'triple', 'approximately', 'about'
+    ],
+
+    // Materials/Ingredients (all domains)
+    materials: [
+      // Cooking
+      'flour', 'sugar', 'salt', 'pepper', 'oil', 'butter', 'egg', 'milk',
+      'water', 'onion', 'garlic', 'tomato', 'cheese', 'meat', 'chicken',
+      // DIY/Building
+      'wood', 'metal', 'plastic', 'fabric', 'leather', 'steel', 'aluminum',
+      'lumber', 'plywood', 'mdf', 'board', 'panel', 'sheet',
+      // Crafts/Sewing
+      'thread', 'yarn', 'fabric', 'cotton', 'polyester', 'felt', 'canvas',
+      'beads', 'ribbon', 'button', 'zipper', 'elastic',
+      // Beauty
+      'foundation', 'concealer', 'powder', 'blush', 'eyeshadow', 'lipstick',
+      'serum', 'moisturizer', 'cleanser', 'toner', 'mask',
+      // Gardening
+      'soil', 'compost', 'fertilizer', 'seeds', 'mulch', 'potting'
+    ],
+
+    // Tools & equipment (all domains)
+    tools: [
+      // Cooking
+      'bowl', 'pan', 'pot', 'knife', 'spoon', 'spatula', 'whisk', 'mixer',
+      'blender', 'oven', 'stove', 'microwave',
+      // DIY/Building
+      'drill', 'saw', 'hammer', 'screwdriver', 'wrench', 'pliers', 'chisel',
+      'clamp', 'level', 'ruler', 'tape measure', 'sandpaper',
+      // Sewing/Crafts
+      'needle', 'scissors', 'pins', 'sewing machine', 'iron', 'rotary cutter',
+      'glue gun', 'brush', 'pencil',
+      // Beauty
+      'brush', 'sponge', 'applicator', 'tweezers', 'curler',
+      // Gardening
+      'shovel', 'rake', 'hoe', 'trowel', 'pruner', 'shears', 'watering can'
+    ],
+
+    // Sequence indicators (universal)
+    sequence: [
+      'first', 'second', 'third', 'then', 'next', 'after', 'finally',
+      'lastly', 'now', 'once', 'until', 'while', 'before', 'during',
+      'step', 'stage', 'phase', 'begin', 'start', 'finish', 'end',
+      'repeat', 'continue', 'proceed'
+    ],
+
+    // Tutorial-specific language
+    tutorial: [
+      'tutorial', 'how to', 'guide', 'instructions', 'recipe', 'diy',
+      'demonstration', 'technique', 'method', 'process', 'procedure',
+      'show you', 'teach', 'learn', 'make', 'create', 'craft'
+    ]
+  };
+
+  // Count keyword matches across all categories
+  let totalMatches = 0;
+  Object.values(instructionalKeywords).forEach(category => {
+    totalMatches += category.filter(keyword => text.includes(keyword)).length;
+  });
+
+  // Check for numbered steps (strong indicator)
+  const hasNumberedSteps = /\b(step|number)?\s*\d+[:\.]/.test(text);
+
+  // Check for imperative mood (commands)
+  const imperativePatterns = [
+    /\b(now |then |next |first )(add|mix|cut|place|take|put|use)/gi,
+    /\b(let's|let us) (add|mix|make|create|start|begin)/gi,
+    /\b(you )(want to|need to|should|can) (add|mix|use|take)/gi
+  ];
+  const hasImperativeLanguage = imperativePatterns.some(pattern => pattern.test(text));
+
+  // Calculate keyword density
+  const keywordDensity = totalMatches / words.length;
+
+  // Decision logic
+  const isInstructional =
+    hasNumberedSteps ||                      // Has "Step 1:", "1.", etc.
+    keywordDensity > 0.05 ||                 // > 5% of words are instructional
+    totalMatches > 10 ||                     // At least 10 instructional words
+    hasImperativeLanguage;                   // Uses command/instructional language
+
+  console.log(`📊 Instructional content analysis:
+    - Total keyword matches: ${totalMatches}
+    - Keyword density: ${(keywordDensity * 100).toFixed(2)}%
+    - Has numbered steps: ${hasNumberedSteps}
+    - Has imperative language: ${hasImperativeLanguage}
+    - Word count: ${words.length}
+    - IS INSTRUCTIONAL: ${isInstructional}
+  `);
+
+  return isInstructional;
+}
+
+/**
  * Complete video processing pipeline
  */
 export async function processVideo(videoSource, isFile = false, userId) {
@@ -590,7 +758,7 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 3: Transcribe audio with Whisper
       transcription = await transcribeAudio(audioPath);
 
-      // Step 4: Detect if this is actually a silent video with background music
+      // Step 4: SMART DETECTION - Check if we need Vision API
       const isLikelyMusicOrChant = (text) => {
         if (!text || text.length < 50) return true;
 
@@ -601,36 +769,75 @@ export async function processVideo(videoSource, isFile = false, userId) {
 
         // If less than 30% unique words, it's likely repetitive music/chant
         if (repetitionRatio < 0.3) {
-          console.log(`Detected repetitive audio (${Math.round(repetitionRatio * 100)}% unique) - likely background music`);
+          console.log(`🎵 Detected repetitive audio (${Math.round(repetitionRatio * 100)}% unique) - likely background music`);
           return true;
         }
 
         // Check for very short transcription relative to video duration
         if (transcription.duration && text.length < transcription.duration * 3) {
-          console.log('Very sparse speech detected - likely background music');
+          console.log('🎵 Very sparse speech detected - likely background music');
           return true;
         }
 
         return false;
       };
 
-      // ONLY extract frames if audio is poor/missing/music
-      if (isLikelyMusicOrChant(transcription.text)) {
-        console.log('Silent/music video detected - using visual analysis');
-        contentType = 'silent_video';
+      // Decision tree for frame extraction
+      let frameCount;
+      let useVisionAPI = false;
 
-        console.log('Extracting frames for visual analysis...');
-        const framePaths = await extractVideoFrames(videoPath, tempDir, 12); // 12 frames for silent videos
+      if (!transcription.text || transcription.text.length < 50) {
+        // No meaningful audio - must use Vision API
+        frameCount = 12;
+        useVisionAPI = true;
+        contentType = 'silent_video';
+        console.log('🔇 Silent video detected → Using 12 frames');
+
+      } else if (isLikelyMusicOrChant(transcription.text)) {
+        // Music/repetitive audio - must use Vision API
+        frameCount = 12;
+        useVisionAPI = true;
+        contentType = 'silent_video';
+        console.log('🎵 Music video detected → Using 12 frames');
+
+      } else if (hasInstructionalContent(transcription)) {
+        // GOOD instructional narration - use fewer frames as supplement
+        frameCount = 6;
+        useVisionAPI = true;
+        contentType = 'video_with_narration';
+        console.log('🎙️ Instructional narration detected → Using 6 supplementary frames');
+
+      } else {
+        // Storytelling/non-instructional narration - need more frames
+        frameCount = 12;
+        useVisionAPI = true;
+        contentType = 'video_with_storytelling';
+        console.log('📖 Non-instructional narration detected → Using 12 frames');
+      }
+
+      // Extract frames and analyze if needed
+      if (useVisionAPI) {
+        console.log(`Extracting ${frameCount} frames for visual analysis...`);
+        const framePaths = await extractVideoFrames(videoPath, tempDir, frameCount);
         const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
 
-        transcription.text = visionAnalysis.text; // Use ONLY visual analysis for music videos
-        transcription.language = 'en'; // Vision returns English descriptions
-        transcription.source = 'vision';
+        if (contentType === 'video_with_narration') {
+          // Combine audio + visual for instructional videos
+          transcription.text = `AUDIO NARRATION:\n${transcription.text}\n\nVISUAL CONTENT:\n${visionAnalysis.text}`;
+          transcription.source = 'audio_and_vision';
+          console.log('✅ Combined narration + visual analysis');
+        } else {
+          // Use ONLY visual for silent/music/storytelling videos
+          transcription.text = visionAnalysis.text;
+          transcription.language = 'en';
+          transcription.source = 'vision';
+          console.log('✅ Using visual analysis only');
+        }
       } else {
-        // Good audio transcription - use it directly (fast!)
-        console.log('Clear speech detected - using audio transcription');
+        // Pure audio transcription (rare - only if perfect narration with no visual text)
         contentType = 'video';
         transcription.source = 'audio';
+        console.log('✅ Using audio transcription only');
       }
     }
 
