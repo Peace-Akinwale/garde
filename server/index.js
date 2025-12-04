@@ -13,6 +13,7 @@ import webhookRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin.js';
 import shoppingRoutes from './routes/shopping.js';
 import remindersRoutes from './routes/reminders.js';
+import reviewsRoutes from './routes/reviews.js';
 import { startReminderScheduler, checkReminders } from './services/reminderScheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,7 +70,7 @@ fs.mkdir(uploadsDir, { recursive: true }).catch(() => {
 app.get('/', (req, res) => {
   res.json({
     name: 'Garde API',
-    version: '1.1.0',
+    version: '1.2.0',
     status: 'running',
     message: 'Backend API for Garde - AI-powered recipe & guide extraction',
     endpoints: {
@@ -78,13 +79,15 @@ app.get('/', (req, res) => {
       guides: '/api/guides/*',
       webhooks: '/api/webhooks/*',
       admin: '/api/admin/*',
-      shopping: '/api/shopping/*'
+      shopping: '/api/shopping/*',
+      reviews: '/api/reviews/*'
     },
     features: [
       'User activity tracking',
       'Email notifications',
       'Admin dashboard',
-      'Shopping lists with smart links'
+      'Shopping lists with smart links',
+      'User reviews & ratings system'
     ],
     frontend: 'https://garde-tau.vercel.app'
   });
@@ -111,6 +114,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/shopping', shoppingRoutes);
 app.use('/api/reminders', remindersRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // Test endpoint to manually trigger reminder check
 app.get('/api/test/check-reminders', async (req, res) => {

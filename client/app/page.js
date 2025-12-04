@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { guidesAPI } from '@/lib/api';
 import GuideCard from '@/components/GuideCard';
 import AddGuideModal from '@/components/AddGuideModal';
+import GuideSuccessModal from '@/components/GuideSuccessModal';
 import SearchBar from '@/components/SearchBar';
 import AuthModal from '@/components/AuthModal';
 import NotificationsModal from '@/components/NotificationsModal';
@@ -20,6 +21,7 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [hasUnseenNotifications, setHasUnseenNotifications] = useState(true);
   const [filters, setFilters] = useState({
@@ -107,6 +109,8 @@ export default function Home() {
       loadGuides(user.id);
     }
     setShowAddModal(false);
+    // Show success modal with celebration and smart review CTA
+    setShowSuccessModal(true);
   };
 
   const handleGuideDeleted = () => {
@@ -343,6 +347,13 @@ export default function Home() {
           userId={user.id}
         />
       )}
+
+      {/* Success Modal with Celebrations & Smart Review CTA */}
+      <GuideSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        guideCount={guides.length}
+      />
 
       {/* Notifications Modal */}
       <NotificationsModal
