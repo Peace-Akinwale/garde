@@ -161,7 +161,42 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         throw new Error('Failed to start processing');
       }
 
-      // Got job ID - start polling
+      // Check if this was a cached result (instant!)
+      if (result.cached && result.guide) {
+        console.log('✅ Cache hit! Processing guide instantly...');
+        setProgress(100);
+        setCurrentStep('Cached result - instant!');
+
+        // Save the cached guide directly (no polling needed)
+        await guidesAPI.create({
+          userId,
+          title: result.guide.title,
+          type: result.guide.type,
+          category: result.guide.category,
+          language: result.guide.language || result.transcription?.language,
+          ingredients: result.guide.ingredients,
+          steps: result.guide.steps,
+          duration: result.guide.duration,
+          servings: result.guide.servings,
+          difficulty: result.guide.difficulty,
+          tips: result.guide.tips,
+          summary: result.guide.summary,
+          transcription: result.transcription?.text,
+          sourceUrl: mode === 'url' ? url : null,
+        });
+
+        setCurrentStep('Done!');
+        setCanClose(true);
+
+        setTimeout(() => {
+          onGuideAdded();
+          resetForm();
+        }, 1000);
+
+        return; // Don't start polling for cached results
+      }
+
+      // Got job ID - start polling for background processing
       setJobId(result.jobId);
       setCurrentStep('Processing...');
       setCanClose(true); // User can now safely close the modal!

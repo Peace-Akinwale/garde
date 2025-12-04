@@ -155,77 +155,98 @@ Be EXHAUSTIVE with text extraction - even tiny text or partially visible text is
 }
 
 /**
- * Analyze images using OpenAI Vision API - PARALLEL + HYBRID DETAIL MODE
- * OPTIMIZED: Processes all frames simultaneously with adaptive detail levels
+ * Analyze images using OpenAI Vision API - BATCHED PARALLEL + HYBRID DETAIL MODE
+ * OPTIMIZED for Render Free Tier: Processes frames in small batches to avoid memory exhaustion
  * First 3 frames use high detail (catch all materials/ingredients)
  * Remaining frames use low detail (faster, cheaper for process steps)
  */
 async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
   try {
     const frameCount = imagePaths.length;
-    console.log(`🚀 Analyzing ${frameCount} images with Vision API in PARALLEL...`);
+    const BATCH_SIZE = 2; // Process 2 frames at a time (safe for free tier: ~40MB memory)
+    console.log(`🚀 Analyzing ${frameCount} images with Vision API (batches of ${BATCH_SIZE})...`);
     const startTime = Date.now();
 
-    // Process ALL frames simultaneously with hybrid detail levels
-    const analyses = await Promise.all(
-      imagePaths.map(async (imagePath, index) => {
-        try {
-          // Read image
-          const imageBuffer = await fsPromises.readFile(imagePath);
-          const base64Image = imageBuffer.toString('base64');
-          const ext = path.extname(imagePath).toLowerCase();
-          const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+    const allAnalyses = [];
 
-          // HYBRID DETAIL: First 3 frames = high detail (materials/ingredients)
-          // Remaining frames = low detail (process steps are easier to see)
-          const detailLevel = index < 3 ? 'high' : 'low';
-          const prompt = getVisionPrompt(index, frameCount, isPhotoCarousel);
+    // Process frames in batches to prevent memory exhaustion on free tier
+    for (let batchStart = 0; batchStart < frameCount; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, frameCount);
+      const batchPaths = imagePaths.slice(batchStart, batchEnd);
 
-          // Call Vision API
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:${mimeType};base64,${base64Image}`,
-                      detail: detailLevel
-                    }
-                  }
-                ]
-              }
-            ],
-            max_tokens: 500
-          });
+      console.log(`📦 Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(frameCount / BATCH_SIZE)} (frames ${batchStart + 1}-${batchEnd})...`);
 
-          const analysis = response.choices[0].message.content;
+      // Process this batch in parallel
+      const batchAnalyses = await Promise.all(
+        batchPaths.map(async (imagePath, batchIndex) => {
+          const globalIndex = batchStart + batchIndex;
 
-          // Delete frame immediately after analysis to free memory
           try {
-            await fsPromises.unlink(imagePath);
-            console.log(`✅ Frame ${index + 1}/${frameCount} (${detailLevel} detail) analyzed and deleted`);
-          } catch (unlinkError) {
-            console.warn(`⚠️ Failed to delete frame ${index + 1}:`, unlinkError.message);
-          }
+            // Read image
+            const imageBuffer = await fsPromises.readFile(imagePath);
+            const base64Image = imageBuffer.toString('base64');
+            const ext = path.extname(imagePath).toLowerCase();
+            const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
 
-          return { index, analysis, detailLevel };
-        } catch (frameError) {
-          console.error(`❌ Error analyzing frame ${index + 1}:`, frameError.message);
-          // Return partial result rather than failing entire batch
-          return { index, analysis: `[Frame ${index + 1} analysis failed]`, detailLevel: 'error' };
-        }
-      })
-    );
+            // HYBRID DETAIL: First 3 frames = high detail (materials/ingredients)
+            // Remaining frames = low detail (process steps are easier to see)
+            const detailLevel = globalIndex < 3 ? 'high' : 'low';
+            const prompt = getVisionPrompt(globalIndex, frameCount, isPhotoCarousel);
+
+            // Call Vision API
+            const response = await openai.chat.completions.create({
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: prompt },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:${mimeType};base64,${base64Image}`,
+                        detail: detailLevel
+                      }
+                    }
+                  ]
+                }
+              ],
+              max_tokens: 500
+            });
+
+            const analysis = response.choices[0].message.content;
+
+            // Delete frame immediately after analysis to free memory
+            try {
+              await fsPromises.unlink(imagePath);
+              console.log(`✅ Frame ${globalIndex + 1}/${frameCount} (${detailLevel} detail) analyzed and deleted`);
+            } catch (unlinkError) {
+              console.warn(`⚠️ Failed to delete frame ${globalIndex + 1}:`, unlinkError.message);
+            }
+
+            return { index: globalIndex, analysis, detailLevel };
+          } catch (frameError) {
+            console.error(`❌ Error analyzing frame ${globalIndex + 1}:`, frameError.message);
+            // Return partial result rather than failing entire batch
+            return { index: globalIndex, analysis: `[Frame ${globalIndex + 1} analysis failed]`, detailLevel: 'error' };
+          }
+        })
+      );
+
+      // Add batch results to overall results
+      allAnalyses.push(...batchAnalyses);
+
+      // Small delay between batches to let memory gc (100ms)
+      if (batchEnd < frameCount) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
 
     // Sort by index to maintain frame order
-    analyses.sort((a, b) => a.index - b.index);
+    allAnalyses.sort((a, b) => a.index - b.index);
 
     // Combine all analyses
-    const combinedText = analyses.map(a => a.analysis).join('\n\n---\n\n');
+    const combinedText = allAnalyses.map(a => a.analysis).join('\n\n---\n\n');
 
     const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`⚡ All ${frameCount} frames analyzed in ${elapsedTime}s (${(elapsedTime / frameCount).toFixed(1)}s avg per frame)`);
