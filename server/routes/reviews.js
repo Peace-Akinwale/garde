@@ -106,13 +106,13 @@ router.get('/', async (req, res) => {
       .from('reviews')
       .select(`
         *,
-        profiles:user_id (email, full_name, avatar_url),
+        profiles (email, full_name, avatar_url),
         review_responses (
           id,
           response_text,
           created_at,
           admin_user_id,
-          profiles:admin_user_id (full_name, avatar_url)
+          profiles!review_responses_admin_user_id_fkey (full_name, avatar_url)
         )
       `)
       .eq('status', 'published')
@@ -247,7 +247,7 @@ router.get('/my-reviews', authenticateUser, async (req, res) => {
           id,
           response_text,
           created_at,
-          profiles:admin_user_id (full_name, avatar_url)
+          profiles!review_responses_admin_user_id_fkey (full_name, avatar_url)
         )
       `)
       .eq('user_id', req.user.id)
@@ -277,12 +277,12 @@ router.get('/admin/all', requireAdmin, async (req, res) => {
       .from('reviews')
       .select(`
         *,
-        profiles:user_id (email, full_name, avatar_url),
+        profiles (email, full_name, avatar_url),
         review_responses (
           id,
           response_text,
           created_at,
-          profiles:admin_user_id (full_name, avatar_url)
+          profiles!review_responses_admin_user_id_fkey (full_name, avatar_url)
         )
       `)
       .order('created_at', { ascending: false });
@@ -336,7 +336,7 @@ router.patch('/admin/:id/status', requireAdmin, async (req, res) => {
       .eq('id', id)
       .select(`
         *,
-        profiles:user_id (email, full_name)
+        profiles (email, full_name)
       `)
       .single();
 
@@ -381,7 +381,7 @@ router.post('/admin/:id/respond', requireAdmin, async (req, res) => {
     // Get review details
     const { data: review, error: reviewError } = await supabase
       .from('reviews')
-      .select('*, profiles:user_id (email, full_name)')
+      .select('*, profiles (email, full_name)')
       .eq('id', id)
       .single();
 
@@ -397,7 +397,7 @@ router.post('/admin/:id/respond', requireAdmin, async (req, res) => {
       })
       .select(`
         *,
-        profiles:admin_user_id (full_name, avatar_url)
+        profiles!review_responses_admin_user_id_fkey (full_name, avatar_url)
       `)
       .single();
 

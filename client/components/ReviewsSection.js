@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Star, MessageSquare, Image as ImageIcon, X, Send, Loader, CheckCircle, AlertCircle, Share2 } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
@@ -13,7 +13,6 @@ export default function ReviewsSection() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [user, setUser] = useState(null);
 
-  const supabase = createClientComponentClient();
   const router = useRouter();
 
   useEffect(() => {
@@ -323,8 +322,6 @@ function ReviewModal({ onClose, onSubmit }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-
-  const supabase = createClientComponentClient();
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
