@@ -283,13 +283,23 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
 
         {processing && (
           <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-3">
               {progress === 100 ? (
                 <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
               ) : (
                 <Loader className="animate-spin text-blue-600 dark:text-blue-400" size={20} />
               )}
-              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentStep}</p>
+              <div className="flex-1">
+                <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{currentStep}</p>
+                <p className="text-xs text-blue-500 dark:text-blue-500 mt-0.5">{progress}% complete</p>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
         )}
