@@ -67,6 +67,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const modalRef = useRef(null);
+  const intentionalCloseRef = useRef(false);
 
   const Icon = typeIcons[guide.type] || FileQuestion;
 
@@ -74,18 +75,43 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
   useEffect(() => {
     if (!isOpen) return;
 
+    // Reset intentional close flag when modal opens
+    intentionalCloseRef.current = false;
+
     // Push state when modal opens
     window.history.pushState({ modalOpen: true }, '');
 
     const handlePopState = (e) => {
-      // When user presses back or swipes back, close the modal
-      onClose();
+      // Only close if this is an intentional navigation (back button)
+      // Check if we have a modal state to prevent accidental closes
+      if (e.state && e.state.modalOpen === false) {
+        intentionalCloseRef.current = true;
+        onClose();
+      } else if (!document.hidden) {
+        // Only close on back button if document is visible
+        intentionalCloseRef.current = true;
+        onClose();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // Prevent modal from closing when browser tab is hidden/shown
+      // This fixes the minimize/resume issue
+      if (document.hidden) {
+        // Tab is being hidden (minimized, switched away)
+        // Do nothing - keep modal open
+      } else {
+        // Tab is being shown again (restored, switched back)
+        // Do nothing - modal should still be open
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isOpen, onClose]);
 
@@ -120,6 +146,8 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
 
     // If swiped more than 40% of screen width in EITHER direction, close modal
     if (Math.abs(swipeOffset) > window.innerWidth * 0.4) {
+      // Mark as intentional close
+      intentionalCloseRef.current = true;
       // Go back in history (will trigger popstate → onClose)
       window.history.back();
     } else {
@@ -337,7 +365,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={() => { intentionalCloseRef.current = true; onClose(); }}
               className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg"
             >
               <X size={24} />
