@@ -159,6 +159,51 @@ router.post('/', authenticateUser, upload.array('screenshots', 5), async (req, r
       return res.status(400).json({ error: 'Review content must be at least 10 characters' });
     }
 
+    // PHASE 2: Auto-moderation spam detection
+    const spamKeywords = ['viagra', 'cialis', 'casino', 'forex', 'crypto scam', 'buy now', 'click here', 'limited time', 'act now', 'free money'];
+    const suspiciousPatterns = [
+      /(.)\1{10,}/i, // Repeated characters (e.g., "aaaaaaaaaa")
+      /https?:\/\//gi, // Multiple URLs
+      /\b\d{10,}\b/g // Long number sequences (phone numbers)
+    ];
+
+    let flagged = false;
+    let flagReason = '';
+
+    // Check for spam keywords
+    const combinedText = `${title} ${content}`.toLowerCase();
+    const foundKeywords = spamKeywords.filter(keyword => combinedText.includes(keyword));
+    if (foundKeywords.length > 0) {
+      flagged = true;
+      flagReason = `Contains spam keywords: ${foundKeywords.join(', ')}`;
+    }
+
+    // Check for suspicious patterns
+    for (const pattern of suspiciousPatterns) {
+      if (pattern.test(combinedText)) {
+        flagged = true;
+        if (flagReason) flagReason += '; ';
+        flagReason += 'Suspicious pattern detected';
+        break;
+      }
+    }
+
+    // Check for ALL CAPS (more than 50% uppercase)
+    const upperCaseCount = (title + content).replace(/[^A-Z]/g, '').length;
+    const totalLetters = (title + content).replace(/[^A-Za-z]/g, '').length;
+    if (totalLetters > 20 && upperCaseCount / totalLetters > 0.5) {
+      flagged = true;
+      if (flagReason) flagReason += '; ';
+      flagReason += 'Excessive capitalization';
+    }
+
+    // Very short reviews with 5 stars (potential fake positive reviews)
+    if (parseInt(rating) === 5 && content.trim().length < 30) {
+      flagged = true;
+      if (flagReason) flagReason += '; ';
+      flagReason += 'Very short 5-star review (potential fake)';
+    }
+
     // Upload screenshots to Supabase Storage
     const screenshotUrls = [];
     if (req.files && req.files.length > 0) {
@@ -195,7 +240,9 @@ router.post('/', authenticateUser, upload.array('screenshots', 5), async (req, r
         title: title.trim(),
         content: content.trim(),
         screenshots: screenshotUrls,
-        status: 'pending' // Pending admin approval
+        status: 'pending', // Pending admin approval
+        flagged_for_review: flagged,
+        flag_reason: flagged ? flagReason : null
       })
       .select()
       .single();
@@ -484,6 +531,179 @@ router.get('/admin/stats', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching review stats:', error);
     res.status(500).json({ error: 'Failed to fetch review statistics' });
+  }
+});
+
+// ==========================================
+// PHASE 2: REVIEW VOTING
+// ==========================================
+
+/**
+ * POST /api/reviews/:id/vote - Vote for a review as helpful
+ */
+router.post('/:id/vote', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if user already voted
+    const { data: existingVote } = await supabase
+      .from('review_votes')
+      .select('id')
+      .eq('review_id', id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (existingVote) {
+      return res.status(400).json({ error: 'You have already voted for this review' });
+    }
+
+    // Create vote
+    const { error: voteError } = await supabase
+      .from('review_votes')
+      .insert({
+        review_id: id,
+        user_id: req.user.id
+      });
+
+    if (voteError) throw voteError;
+
+    // Get updated helpful count
+    const { data: review } = await supabase
+      .from('reviews')
+      .select('helpful_count')
+      .eq('id', id)
+      .single();
+
+    res.json({
+      message: 'Vote recorded successfully',
+      helpful_count: review?.helpful_count || 0
+    });
+  } catch (error) {
+    console.error('Error voting for review:', error);
+    res.status(500).json({ error: 'Failed to vote for review' });
+  }
+});
+
+/**
+ * DELETE /api/reviews/:id/vote - Remove vote from a review
+ */
+router.delete('/:id/vote', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { error: deleteError } = await supabase
+      .from('review_votes')
+      .delete()
+      .eq('review_id', id)
+      .eq('user_id', req.user.id);
+
+    if (deleteError) throw deleteError;
+
+    // Get updated helpful count
+    const { data: review } = await supabase
+      .from('reviews')
+      .select('helpful_count')
+      .eq('id', id)
+      .single();
+
+    res.json({
+      message: 'Vote removed successfully',
+      helpful_count: review?.helpful_count || 0
+    });
+  } catch (error) {
+    console.error('Error removing vote:', error);
+    res.status(500).json({ error: 'Failed to remove vote' });
+  }
+});
+
+/**
+ * GET /api/reviews/:id/vote-status - Check if user voted for a review
+ */
+router.get('/:id/vote-status', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: vote } = await supabase
+      .from('review_votes')
+      .select('id')
+      .eq('review_id', id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    res.json({ hasVoted: !!vote });
+  } catch (error) {
+    console.error('Error checking vote status:', error);
+    res.status(500).json({ error: 'Failed to check vote status' });
+  }
+});
+
+// ==========================================
+// PHASE 2: USER BADGES
+// ==========================================
+
+/**
+ * GET /api/reviews/badges/:userId - Get user's badges
+ */
+router.get('/badges/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const { data: badges, error } = await supabase.rpc('get_user_badges', {
+      user_uuid: userId
+    });
+
+    if (error) throw error;
+
+    res.json({ badges });
+  } catch (error) {
+    console.error('Error fetching user badges:', error);
+    res.status(500).json({ error: 'Failed to fetch user badges' });
+  }
+});
+
+// ==========================================
+// PHASE 2: CSV EXPORT
+// ==========================================
+
+/**
+ * GET /api/reviews/admin/export - Export all reviews as CSV
+ */
+router.get('/admin/export', requireAdmin, async (req, res) => {
+  try {
+    const { data: reviews, error } = await supabase
+      .from('reviews')
+      .select(`
+        *,
+        profiles!reviews_user_id_profiles_fkey (email, full_name)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Build CSV
+    const headers = ['ID', 'Date', 'Status', 'Rating', 'Title', 'Content', 'User Name', 'User Email', 'Helpful Votes', 'Flagged', 'Flag Reason'];
+    const rows = reviews.map(r => [
+      r.id,
+      new Date(r.created_at).toISOString(),
+      r.status,
+      r.rating,
+      `"${(r.title || '').replace(/"/g, '""')}"`,
+      `"${(r.content || '').replace(/"/g, '""')}"`,
+      `"${(r.profiles?.full_name || 'Anonymous').replace(/"/g, '""')}"`,
+      r.profiles?.email || '',
+      r.helpful_count || 0,
+      r.flagged_for_review ? 'Yes' : 'No',
+      `"${(r.flag_reason || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="garde-reviews-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Error exporting reviews:', error);
+    res.status(500).json({ error: 'Failed to export reviews' });
   }
 });
 

@@ -172,12 +172,82 @@ function ReviewCard({ review, renderStars }) {
   const [showFullContent, setShowFullContent] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [helpfulCount, setHelpfulCount] = useState(review.helpful_count || 0);
+  const [badges, setBadges] = useState(null);
+  const [votingLoading, setVotingLoading] = useState(false);
+
   const contentPreview = review.content.length > 300
     ? review.content.slice(0, 300) + '...'
     : review.content;
 
+  // Fetch user badges and vote status
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        // Fetch badges
+        const badgesRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews/badges/${review.user_id}`);
+        setBadges(badgesRes.data.badges);
+
+        // Check vote status
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          try {
+            const voteRes = await axios.get(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/reviews/${review.id}/vote-status`,
+              { headers: { Authorization: `Bearer ${session.access_token}` } }
+            );
+            setHasVoted(voteRes.data.hasVoted);
+          } catch (err) {
+            // User not logged in or error - ignore
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [review.id, review.user_id]);
+
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/reviews` : '';
   const shareText = `Check out this ${review.rating}-star review of Garde: "${review.title}"`;
+
+  const handleVote = async () => {
+    setVotingLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Please sign in to vote');
+        setVotingLoading(false);
+        return;
+      }
+
+      if (hasVoted) {
+        // Remove vote
+        const res = await axios.delete(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/reviews/${review.id}/vote`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
+        setHelpfulCount(res.data.helpful_count);
+        setHasVoted(false);
+      } else {
+        // Add vote
+        const res = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/reviews/${review.id}/vote`,
+          {},
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
+        setHelpfulCount(res.data.helpful_count);
+        setHasVoted(true);
+      }
+    } catch (error) {
+      console.error('Error voting:', error);
+      alert(error.response?.data?.error || 'Failed to vote');
+    } finally {
+      setVotingLoading(false);
+    }
+  };
 
   const handleShare = (platform) => {
     const encodedUrl = encodeURIComponent(shareUrl);
@@ -213,9 +283,46 @@ function ReviewCard({ review, renderStars }) {
             {review.profiles?.full_name?.[0]?.toUpperCase() || '?'}
           </div>
           <div>
-            <p className="font-semibold text-gray-900 dark:text-white">
-              {review.profiles?.full_name || 'Anonymous'}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-gray-900 dark:text-white">
+                {review.profiles?.full_name || 'Anonymous'}
+              </p>
+              {/* Badges */}
+              {badges && (
+                <div className="flex items-center gap-1">
+                  {badges.verified_user && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" title="Verified User (5+ guides)">
+                      ✓ Verified
+                    </span>
+                  )}
+                  {badges.power_user && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400" title="Power User (25+ guides)">
+                      ⚡ Power User
+                    </span>
+                  )}
+                  {badges.super_user && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" title="Super User (100+ guides)">
+                      🌟 Super User
+                    </span>
+                  )}
+                  {badges.early_adopter && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" title="Early Adopter">
+                      🎯 Early Adopter
+                    </span>
+                  )}
+                  {badges.top_reviewer && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" title="Top Reviewer (10+ helpful votes)">
+                      ⭐ Top Reviewer
+                    </span>
+                  )}
+                  {badges.active_reviewer && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400" title="Active Reviewer (3+ reviews)">
+                      💬 Active Reviewer
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {new Date(review.created_at).toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -285,6 +392,40 @@ function ReviewCard({ review, renderStars }) {
           {showFullContent ? 'Show less' : 'Read more'}
         </button>
       )}
+
+      {/* Helpful Voting */}
+      <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <button
+          onClick={handleVote}
+          disabled={votingLoading}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+            hasVoted
+              ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-700'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          title={hasVoted ? 'Remove helpful vote' : 'Mark as helpful'}
+        >
+          <svg
+            className="w-5 h-5"
+            fill={hasVoted ? 'currentColor' : 'none'}
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+            />
+          </svg>
+          <span className="font-medium">Helpful{helpfulCount > 0 ? ` (${helpfulCount})` : ''}</span>
+        </button>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {helpfulCount === 0 && 'Be the first to find this helpful'}
+          {helpfulCount === 1 && '1 person found this helpful'}
+          {helpfulCount > 1 && `${helpfulCount} people found this helpful`}
+        </span>
+      </div>
 
       {/* Screenshots */}
       {review.screenshots && review.screenshots.length > 0 && (

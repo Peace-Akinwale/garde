@@ -161,21 +161,59 @@ export default function AdminReviewsPage() {
           <StatCard label="Avg Rating" value={stats.averageRating ? `${stats.averageRating}⭐` : 'N/A'} color="purple" />
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-          {['all', 'pending', 'published', 'hidden'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 font-medium capitalize whitespace-nowrap ${
-                filter === f
-                  ? 'border-b-2 border-indigo-600 text-indigo-600'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              {f} {f !== 'all' && stats[f] > 0 && `(${stats[f]})`}
-            </button>
-          ))}
+        {/* Actions Bar */}
+        <div className="flex items-center justify-between mb-6">
+          {/* Filter Tabs */}
+          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+            {['all', 'pending', 'published', 'hidden'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-2 font-medium capitalize whitespace-nowrap ${
+                  filter === f
+                    ? 'border-b-2 border-indigo-600 text-indigo-600'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {f} {f !== 'all' && stats[f] > 0 && `(${stats[f]})`}
+              </button>
+            ))}
+          </div>
+
+          {/* Export CSV Button */}
+          <a
+            href={`${process.env.NEXT_PUBLIC_API_URL}/api/reviews/admin/export?token=${user?.access_token || ''}`}
+            download
+            onClick={async (e) => {
+              e.preventDefault();
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const response = await axios.get(
+                  `${process.env.NEXT_PUBLIC_API_URL}/api/reviews/admin/export`,
+                  {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                    responseType: 'blob'
+                  }
+                );
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `garde-reviews-${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              } catch (error) {
+                console.error('Export error:', error);
+                alert('Failed to export reviews');
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition whitespace-nowrap"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export CSV
+          </a>
         </div>
 
         {/* Reviews List */}
@@ -259,8 +297,22 @@ function AdminReviewCard({ review, onUpdateStatus, onDelete, onRespond }) {
                 NEW
               </span>
             )}
+            {review.flagged_for_review && (
+              <span className="px-2 py-1 text-xs font-medium rounded bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                FLAGGED
+              </span>
+            )}
           </div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{review.title}</h3>
+          {review.flagged_for_review && review.flag_reason && (
+            <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+              <p className="text-sm font-medium text-orange-800 dark:text-orange-400 mb-1">⚠️ Auto-moderation Alert</p>
+              <p className="text-sm text-orange-700 dark:text-orange-300">{review.flag_reason}</p>
+            </div>
+          )}
           <p className="text-sm text-gray-600 dark:text-gray-400">
             by {review.profiles?.full_name || 'Anonymous'} ({review.profiles?.email}) •{' '}
             {new Date(review.created_at).toLocaleDateString()}
