@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { guidesAPI } from '@/lib/api';
+import { guidesAPI, announcementsAPI } from '@/lib/api';
 import GuideCard from '@/components/GuideCard';
 import AddGuideModal from '@/components/AddGuideModal';
 import GuideSuccessModal from '@/components/GuideSuccessModal';
@@ -128,6 +128,35 @@ export default function Home() {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+    }
+  };
+
+  const checkForNewAnnouncements = async () => {
+    try {
+      const data = await announcementsAPI.getAll();
+      const announcements = data.announcements || [];
+      
+      if (announcements.length === 0) {
+        setHasUnseenNotifications(false);
+        return;
+      }
+
+      // Get last viewed timestamp from localStorage
+      const lastViewed = localStorage.getItem('lastViewedAnnouncements');
+      
+      if (!lastViewed) {
+        // Never viewed before
+        setHasUnseenNotifications(true);
+        return;
+      }
+
+      // Check if there are announcements newer than last viewed
+      const lastViewedDate = new Date(lastViewed);
+      const hasNew = announcements.some(a => new Date(a.date) > lastViewedDate);
+      setHasUnseenNotifications(hasNew);
+    } catch (error) {
+      console.error('Error checking for new announcements:', error);
+      setHasUnseenNotifications(false);
     }
   };
 

@@ -1,43 +1,58 @@
 'use client';
 
-import { X, Sparkles, Video, Camera, Palette } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Sparkles, Video, Camera, Palette, Tag, Hammer, ChefHat, Loader } from 'lucide-react';
+import { announcementsAPI } from '@/lib/api';
 
-const updates = [
-  {
-    id: 1,
-    date: '2024-12-01',
-    title: 'Vision AI for TikTok Photo Slides',
-    description: 'AI can now read and extract recipes from TikTok photo carousels and slideshows!',
-    icon: Camera,
-    color: 'bg-pink-100 text-pink-700',
-  },
-  {
-    id: 2,
-    date: '2024-12-01',
-    title: 'Silent Video Recognition',
-    description: 'Cooking videos without voiceover? No problem! AI now analyzes cooking actions visually.',
-    icon: Video,
-    color: 'bg-purple-100 text-purple-700',
-  },
-  {
-    id: 3,
-    date: '2024-12-01',
-    title: 'New Garde Logo',
-    description: 'Fresh new look with a chef hat icon! Check out the browser tab.',
-    icon: Palette,
-    color: 'bg-blue-100 text-blue-700',
-  },
-  {
-    id: 4,
-    date: '2024-11-30',
-    title: 'Improved Yoruba Support',
-    description: 'Enhanced accuracy for Yoruba and Nigerian English recipe extraction.',
-    icon: Sparkles,
-    color: 'bg-green-100 text-green-700',
-  },
-];
+// Icon mapping
+const iconMap = {
+  camera: Camera,
+  video: Video,
+  palette: Palette,
+  sparkles: Sparkles,
+  tag: Tag,
+  hammer: Hammer,
+  chefhat: ChefHat,
+};
+
+// Color mapping
+const colorMap = {
+  pink: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+  purple: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  green: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  red: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  yellow: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+};
 
 export default function NotificationsModal({ isOpen, onClose }) {
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchAnnouncements();
+      // Mark as viewed in localStorage
+      localStorage.setItem('lastViewedAnnouncements', new Date().toISOString());
+    }
+  }, [isOpen]);
+
+  const fetchAnnouncements = async () => {
+    try {
+      setLoading(true);
+      const data = await announcementsAPI.getAll();
+      setAnnouncements(data.announcements || []);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching announcements:', err);
+      setError('Failed to load announcements');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -61,34 +76,60 @@ export default function NotificationsModal({ isOpen, onClose }) {
 
         {/* Updates List */}
         <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(80vh-120px)]">
-          {updates.map((update) => {
-            const Icon = update.icon;
-            return (
-              <div
-                key={update.id}
-                className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 hover:shadow-md transition"
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader className="animate-spin text-primary-600" size={32} />
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-600 dark:text-red-400">{error}</p>
+              <button
+                onClick={fetchAnnouncements}
+                className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
               >
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-lg ${update.color}`}>
-                    <Icon size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {update.title}
-                      </h3>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {update.date}
-                      </span>
+                Retry
+              </button>
+            </div>
+          ) : announcements.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">No announcements yet</p>
+            </div>
+          ) : (
+            announcements.map((update) => {
+              const Icon = iconMap[update.icon.toLowerCase()] || Sparkles;
+              const colorClass = colorMap[update.color.toLowerCase()] || colorMap.blue;
+
+              return (
+                <div
+                  key={update.id}
+                  className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 hover:shadow-md transition"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg ${colorClass}`}>
+                      <Icon size={24} />
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {update.description}
-                    </p>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          {update.title}
+                        </h3>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(update.date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {update.description}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Footer */}

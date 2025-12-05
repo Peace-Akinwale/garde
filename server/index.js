@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.js';
 import shoppingRoutes from './routes/shopping.js';
 import remindersRoutes from './routes/reminders.js';
 import reviewsRoutes from './routes/reviews.js';
+import announcementsRoutes from './routes/announcements.js';
 import { startReminderScheduler, checkReminders } from './services/reminderScheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,6 +116,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/shopping', shoppingRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/announcements', announcementsRoutes);
 
 // Test endpoint to manually trigger reminder check
 app.get('/api/test/check-reminders', async (req, res) => {

@@ -281,4 +281,15 @@ export const remindersAPI = {
   },
 };
 
+
+export const announcementsAPI = {
+  /**
+   * Get all announcements
+   */
+  getAll: async () => {
+    const response = await api.get('/api/announcements');
+    return response.data;
+  },
+};
+
 export default api;
