@@ -73,13 +73,25 @@ export default function ReviewsSection() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">User Reviews</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          See what our community is saying about Garde
-        </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* Back to Home Button */}
+        <button
+          onClick={() => router.push('/')}
+          className="mb-6 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>Back to Home</span>
+        </button>
+
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">User Reviews</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            See what our community is saying about Garde
+          </p>
 
         {stats.totalReviews > 0 && (
           <div className="flex items-center justify-center gap-4 mb-6">
@@ -151,6 +163,7 @@ export default function ReviewsSection() {
           }}
         />
       )}
+      </div>
     </div>
   );
 }
