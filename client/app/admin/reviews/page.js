@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Star, Eye, EyeOff, Trash2, MessageSquare, CheckCircle, XCircle, Loader, ArrowLeft, Send, AlertCircle } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
@@ -14,7 +14,6 @@ export default function AdminReviewsPage() {
   const [filter, setFilter] = useState('all'); // all, pending, published, hidden
   const [respondingTo, setRespondingTo] = useState(null);
 
-  const supabase = createClientComponentClient();
   const router = useRouter();
 
   useEffect(() => {
@@ -354,7 +353,6 @@ function ResponseModal({ review, onClose, onSuccess }) {
   const [responseText, setResponseText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const supabase = createClientComponentClient();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
