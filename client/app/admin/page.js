@@ -12,8 +12,11 @@ import {
   Download,
   Eye,
   Clock,
-  Activity
+  Activity,
+  Star,
+  MessageCircle
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -24,6 +27,8 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+
+  const router = useRouter();
 
   useEffect(() => {
     checkAdminAccess();
@@ -142,7 +147,7 @@ export default function AdminDashboard() {
 
         {/* Analytics Cards */}
         {dashboard && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <AnalyticsCard
               title="Total Users"
               value={dashboard.totalUsers || 0}
@@ -161,6 +166,18 @@ export default function AdminDashboard() {
               icon={FileText}
               color="purple"
             />
+            <button
+              onClick={() => router.push('/admin/reviews')}
+              className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 text-left hover:shadow-lg transition-all transform hover:scale-105 cursor-pointer"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                  <Star size={24} />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Manage</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">User Reviews</p>
+            </button>
           </div>
         )}
 
