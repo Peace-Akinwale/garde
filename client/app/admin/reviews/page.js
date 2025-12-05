@@ -29,9 +29,11 @@ export default function AdminReviewsPage() {
 
   const checkAdminAccess = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (sessionError || !session) {
+        console.error('No session found:', sessionError);
+        setLoading(false);
         router.push('/');
         return;
       }
@@ -39,23 +41,33 @@ export default function AdminReviewsPage() {
       setUser(session.user);
 
       // Check if user is admin
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('is_admin')
         .eq('id', session.user.id)
         .single();
 
-      if (!profile?.is_admin) {
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        setLoading(false);
         router.push('/');
         return;
       }
 
+      if (!profile?.is_admin) {
+        console.log('User is not admin:', session.user.email);
+        setLoading(false);
+        router.push('/');
+        return;
+      }
+
+      console.log('Admin access granted for:', session.user.email);
       setIsAdmin(true);
+      setLoading(false);
     } catch (error) {
       console.error('Error checking admin access:', error);
-      router.push('/');
-    } finally {
       setLoading(false);
+      router.push('/');
     }
   };
 
