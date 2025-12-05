@@ -26,6 +26,32 @@ const typeIcons = {
   other: FileQuestion,
   unclear: FileQuestion,
 };
+// Get contextual labels based on content type
+const getContentLabels = (type) => {
+  const labels = {
+    recipe: {
+      ingredients: 'Ingredients',
+      steps: 'Instructions',
+    },
+    craft: {
+      ingredients: 'Materials & Supplies',
+      steps: 'Steps',
+    },
+    howto: {
+      ingredients: 'Products & Tools',
+      steps: 'Steps',
+    },
+    other: {
+      ingredients: "What You'll Need",
+      steps: 'Steps',
+    },
+    unclear: {
+      ingredients: 'Ingredients / Materials',
+      steps: 'Instructions',
+    },
+  };
+  return labels[type] || labels.unclear;
+};
 
 export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpdated }) {
   const [editing, setEditing] = useState(false);
@@ -261,10 +287,10 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
                   onChange={(e) =>
                     setEditedGuide({ ...editedGuide, title: e.target.value })
                   }
-                  className="text-2xl font-bold text-gray-900 dark:text-white bg-white dark:bg-slate-700 border-b-2 border-primary-500 focus:outline-none"
+                  className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white bg-white dark:bg-slate-700 border-b-2 border-primary-500 focus:outline-none"
                 />
               ) : (
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{guide.title}</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{guide.title}</h2>
               )}
               <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{guide.type}</p>
             </div>
@@ -482,7 +508,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Ingredients / Materials
+                  {getContentLabels(guide.type).ingredients}
                 </h3>
                 {editing && (
                   <button
@@ -532,7 +558,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Instructions
+                  {getContentLabels(guide.type).steps}
                 </h3>
                 {editing && (
                   <button

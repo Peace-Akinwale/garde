@@ -552,11 +552,25 @@ CRITICAL EXTRACTION RULES:
 
 5. **Tips**: Extract ALL tips, warnings, substitutions, or additional notes mentioned
 
-Please analyze this transcription and extract a structured guide. Determine if this is:
-1. A cooking recipe
-2. A craft/DIY project (soap making, furniture, clothing, etc.)
-3. A general how-to guide
-4. Something else
+Please analyze this transcription and extract a structured guide. Carefully determine the content type:
+
+1. **recipe** - Cooking, baking, drinks, or any food preparation
+     Examples: pasta dishes, cakes, smoothies, cocktails, traditional cuisine
+
+2. **craft** - DIY projects, handmade items, or physical crafts
+     Examples: soap making, candle making, woodworking, knitting, sewing, furniture assembly,
+  jewelry making
+
+3. **howto** - Beauty, personal care, styling, or general tutorials (non-food, non-craft)
+     Examples: hair styling, makeup application, skincare routines, nail art, home organization,
+  fitness exercises
+4. **other** - Informational content, tours, reviews, or anything else
+
+Categorization Guidelines:
+- If it involves cooking or food preparation → type: "recipe"
+- If it involves making physical crafts or DIY projects → type: "craft"
+- If it involves beauty, personal care, or general how-to tutorials → type: "howto"
+- If unclear or none of the above → type: "other" or "unclear"
 
 Return a JSON object with this structure:
 {

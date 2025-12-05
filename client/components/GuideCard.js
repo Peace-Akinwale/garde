@@ -38,6 +38,33 @@ function formatTimeAgo(dateString) {
   return `${Math.floor(days / 365)}y ago`;
 }
 
+// Get contextual labels based on content type
+  const getContentLabels = (type) => {
+    const labels = {
+      recipe: {
+        ingredients: 'ingredient',
+        ingredientsPlural: 'ingredients',
+      },
+      craft: {
+        ingredients: 'material',
+        ingredientsPlural: 'materials',
+      },
+      howto: {
+        ingredients: 'product',
+        ingredientsPlural: 'products',
+      },
+      other: {
+        ingredients: 'item',
+        ingredientsPlural: 'items',
+      },
+      unclear: {
+        ingredients: 'ingredient',
+        ingredientsPlural: 'ingredients',
+      },
+    };
+    return labels[type] || labels.unclear;
+  };
+
 const typeIcons = {
   recipe: ChefHat,
   craft: Hammer,
@@ -171,7 +198,8 @@ export default function GuideCard({ guide, onDeleted, userId }) {
         {guide.ingredients && guide.ingredients.length > 0 && (
           <div className="flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              {guide.ingredients.length} ingredient{guide.ingredients.length !== 1 ? 's' : ''}
+              {guide.ingredients.length} {guide.ingredients.length !== 1 ?
+  getContentLabels(guide.type).ingredientsPlural : getContentLabels(guide.type).ingredients}
               {guide.steps && guide.steps.length > 0 && (
                 <span> • {guide.steps.length} step{guide.steps.length !== 1 ? 's' : ''}</span>
               )}
