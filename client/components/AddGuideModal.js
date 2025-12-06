@@ -167,24 +167,8 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         setProgress(100);
         setCurrentStep('Cached result - instant!');
 
-        // Save the cached guide directly (no polling needed)
-        await guidesAPI.create({
-          userId,
-          title: result.guide.title,
-          type: result.guide.type,
-          category: result.guide.category,
-          language: result.guide.language || result.transcription?.language,
-          ingredients: result.guide.ingredients,
-          steps: result.guide.steps,
-          duration: result.guide.duration,
-          servings: result.guide.servings,
-          difficulty: result.guide.difficulty,
-          tips: result.guide.tips,
-          summary: result.guide.summary,
-          transcription: result.transcription?.text,
-          sourceUrl: mode === 'url' ? url : null,
-        });
-
+        // Backend already cloned and saved the guide to database
+        // No need to save again - just refresh the UI
         setCurrentStep('Done!');
         setCanClose(true);
 
