@@ -105,15 +105,23 @@ export const guidesAPI = {
   delete: async (guideId) => {
     const response = await api.delete(`/api/guides/${guideId}`);
     return response.data;
-  },
+    },
 
-  /**
-   * Get user statistics
-   */
-  getStats: async (userId) => {
-    const response = await api.get(`/api/guides/stats/${userId}`);
-    return response.data;
-  },
+    /**
+   * Toggle pin status for a guide
+    */
+    togglePin: async (guideId, userId, pinned) => {
+      const response = await api.patch(`/api/guides/${guideId}/pin`, { userId, pinned });
+      return response.data;
+    },
+
+    /**
+     * Get user statistics
+     */
+    getStats: async (userId) => {
+      const response = await api.get(`/api/guides/stats/${userId}`);
+      return response.data;
+    },
 };
 
 export const shoppingAPI = {

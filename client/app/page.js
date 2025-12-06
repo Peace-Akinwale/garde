@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { guidesAPI, announcementsAPI } from '@/lib/api';
 import GuideCard from '@/components/GuideCard';
+import GuideListItem from '@/components/GuideListItem';
 import AddGuideModal from '@/components/AddGuideModal';
 import GuideSuccessModal from '@/components/GuideSuccessModal';
 import SearchBar from '@/components/SearchBar';
@@ -11,7 +12,8 @@ import AuthModal from '@/components/AuthModal';
 import NotificationsModal from '@/components/NotificationsModal';
 import Navigation from '@/components/Navigation';
 import ProfileModal from '@/components/ProfileModal';
-import { Plus, LogOut, User, Moon, Sun, Bell } from 'lucide-react';
+import { Plus, LogOut, User, Moon, Sun, Bell, Grid3x3, List } from 'lucide-react';
+
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -24,6 +26,7 @@ export default function Home() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [hasUnseenNotifications, setHasUnseenNotifications] = useState(true);
+  const [viewMode, setViewMode] = useState('grid');
   const [filters, setFilters] = useState({
     search: '',
     type: 'all',
@@ -283,11 +286,29 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
+                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2
+rounded-lg hover:bg-primary-600 transition"
               >
                 <Plus size={20} />
                 <span className="hidden sm:inline">Add Guide</span>
               </button>
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg
+p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                  title="Grid View"
+                >
+                  <Grid3x3 size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                  title="List View"
+                >
+                  <List size={18} />
+                </button>
+              </div>
               <button
                 onClick={handleOpenNotifications}
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition relative"
@@ -353,10 +374,21 @@ export default function Home() {
               Add Your First Guide
             </button>
           </div>
-        ) : (
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {guides.map((guide) => (
               <GuideCard
+                key={guide.id}
+                guide={guide}
+                userId={user.id}
+                onDeleted={handleGuideDeleted}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {guides.map((guide) => (
+              <GuideListItem
                 key={guide.id}
                 guide={guide}
                 userId={user.id}

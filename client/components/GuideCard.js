@@ -13,8 +13,9 @@ import {
   Users,
   TrendingUp,
   Video,
-  ShoppingCart,
-} from 'lucide-react';
+    ShoppingCart,
+    Pin,
+  } from 'lucide-react';
 import GuideDetailModal from './GuideDetailModal';
 import ShoppingListSelector from './ShoppingListSelector';
 
@@ -96,29 +97,47 @@ const difficultyColors = {
 };
 
 export default function GuideCard({ guide, onDeleted, userId }) {
-  const [showDetail, setShowDetail] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showShoppingSelector, setShowShoppingSelector] = useState(false);
+    const [showDetail, setShowDetail] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [showShoppingSelector, setShowShoppingSelector] = useState(false);
+    const [isPinned, setIsPinned] = useState(guide.pinned || false);
+    const [pinning, setPinning] = useState(false);
 
-  const Icon = typeIcons[guide.type] || FileQuestion;
+    const Icon = typeIcons[guide.type] || FileQuestion;
   const cardBorderColor = typeColors[guide.type] || typeColors.other;
   const badgeColor = typeBadgeColors[guide.type] || typeBadgeColors.other;
 
-  const handleDelete = async (e) => {
-    e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this guide?')) return;
+    const handleDelete = async (e) => {
+      e.stopPropagation();
+      if (!confirm('Are you sure you want to delete this guide?')) return;
 
-    try {
-      setDeleting(true);
-      await guidesAPI.delete(guide.id);
-      onDeleted();
-    } catch (error) {
-      console.error('Error deleting guide:', error);
-      alert('Failed to delete guide');
-    } finally {
-      setDeleting(false);
-    }
-  };
+      try {
+        setDeleting(true);
+        await guidesAPI.delete(guide.id);
+        onDeleted();
+      } catch (error) {
+        console.error('Error deleting guide:', error);
+        alert('Failed to delete guide');
+      } finally {
+        setDeleting(false);
+      }
+    };
+
+    const handlePin = async (e) => {
+      e.stopPropagation();
+      try {
+        setPinning(true);
+        const newPinnedState = !isPinned;
+        await guidesAPI.togglePin(guide.id, userId, newPinnedState);
+        setIsPinned(newPinnedState);
+        onDeleted();
+      } catch (error) {
+        console.error('Error toggling pin:', error);
+        alert('Failed to toggle pin');
+      } finally {
+        setPinning(false);
+      }
+    };
 
   return (
     <>
@@ -148,16 +167,28 @@ export default function GuideCard({ guide, onDeleted, userId }) {
                 <Clock size={12} />
                 <span>{formatTimeAgo(guide.created_at)}</span>
               </div>
+
             )}
           </div>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
-            title="Delete guide"
-          >
-            <Trash2 size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePin}
+              disabled={pinning}
+              className={`transition disabled:opacity-50 ${isPinned ? 'text-primary-600' :
+'text-gray-400 hover:text-primary-600'}`}
+              title={isPinned ? 'Unpin guide' : 'Pin guide'}
+            >
+              <Pin size={16} fill={isPinned ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
+              title="Delete guide"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Title */}

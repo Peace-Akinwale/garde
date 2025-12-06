@@ -13,11 +13,13 @@ router.get('/:userId', async (req, res) => {
     const { userId } = req.params;
     const { search, type, category } = req.query;
 
-    let query = supabase
-      .from('guides')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+let query = supabase
+    .from('guides')
+    .select('*')
+    .eq('user_id', userId)
+    .order('pinned', { ascending: false })
+    .order('pinned_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
 
     // Apply filters
     if (search) {
@@ -164,6 +166,49 @@ router.post('/', async (req, res) => {
     });
   }
 });
+
+ /**
+   * PATCH /api/guides/:guideId/pin
+   * Toggle pin status for a guide
+   */
+  router.patch('/:guideId/pin', async (req, res) => {
+    try {
+      const { guideId } = req.params;
+      const { userId, pinned } = req.body;
+
+      if (typeof pinned !== 'boolean') {
+        return res.status(400).json({
+          error: 'Pinned status must be a boolean',
+        });
+      }
+
+      const updateData = {
+        pinned,
+        pinned_at: pinned ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('guides')
+        .update(updateData)
+        .eq('id', guideId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+      res.status(500).json({
+        error: 'Failed to toggle pin',
+        message: error.message,
+      });
+    }
+  });
 
 /**
  * PATCH /api/guides/:guideId
