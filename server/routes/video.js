@@ -66,11 +66,14 @@ router.post('/process-url', async (req, res) => {
         .single();
 
       if (cloneError) {
-        console.error('Failed to clone guide:', cloneError);
+        console.error('❌ Failed to clone guide:', cloneError);
+        console.error('Clone error details:', JSON.stringify(cloneError, null, 2));
+        console.log('Falling back to normal processing...');
         // Fall through to normal processing
       } else {
         // Return cached result immediately (< 1 second response!)
-        console.log(`🎉 Cache hit! Guide cloned successfully in < 1 second`);
+        console.log(`🎉 Cache hit! Guide cloned successfully (ID: ${clonedGuide.id}) for user ${userId}`);
+        console.log(`📊 Cloned guide details: ${clonedGuide.title} | Type: ${clonedGuide.type}`);
         return res.json({
           success: true,
           cached: true,

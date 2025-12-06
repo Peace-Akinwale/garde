@@ -91,7 +91,12 @@ export default function Home() {
   const loadGuides = async (userId) => {
     try {
       setLoading(true);
+      console.log('📥 Loading guides for user:', userId);
       const response = await guidesAPI.getAll(userId, filters);
+      console.log('📊 Guides loaded:', response.data?.length || 0, 'guides');
+      if (response.data?.length > 0) {
+        console.log('📋 Latest guide:', response.data[0].title);
+      }
       setGuides(response.data || []);
     } catch (error) {
       console.error('Error loading guides:', error);

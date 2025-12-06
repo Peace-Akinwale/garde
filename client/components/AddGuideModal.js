@@ -164,6 +164,9 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
       // Check if this was a cached result (instant!)
       if (result.cached && result.guide) {
         console.log('✅ Cache hit! Processing guide instantly...');
+        console.log('📋 Cached guide:', result.guide);
+        console.log('👤 User ID:', userId);
+        console.log('🔍 Guide user_id:', result.guide.user_id);
         setProgress(100);
         setCurrentStep('Cached result - instant!');
 
@@ -172,6 +175,7 @@ export default function AddGuideModal({ isOpen, onClose, onGuideAdded, userId })
         setCurrentStep('Done!');
         setCanClose(true);
 
+        console.log('🔄 Calling onGuideAdded to refresh guide list...');
         setTimeout(() => {
           onGuideAdded();
           resetForm();
