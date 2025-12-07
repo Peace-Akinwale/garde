@@ -473,8 +473,9 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
             const isTikTok = guide.source_url.includes('tiktok.com');
             const isInstagram = guide.source_url.includes('instagram.com');
             const isTwitter = guide.source_url.includes('twitter.com') || guide.source_url.includes('x.com');
+            const isFacebook = guide.source_url.includes('facebook.com') || guide.source_url.includes('fb.watch') || guide.source_url.includes('fb.com');
             const isYouTube = guide.source_url.includes('youtube.com') || guide.source_url.includes('youtu.be');
-            const canEmbed = !isTikTok && !isInstagram && !isTwitter;
+            const canEmbed = !isTikTok && !isInstagram && !isTwitter && !isFacebook;
 
             return (
               <div className="mb-6">
@@ -498,12 +499,14 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
                     className={`flex items-center justify-center gap-3 p-6 ${
                       isTwitter
                         ? 'bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700'
+                        : isFacebook
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900'
                         : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
                     } text-white rounded-lg transition shadow-lg`}
                   >
                     <Video size={24} />
                     <div className="text-left">
-                      <p className="font-semibold">Watch on {isTwitter ? 'X' : isTikTok ? 'TikTok' : 'Instagram'}</p>
+                      <p className="font-semibold">Watch on {isTwitter ? 'X' : isTikTok ? 'TikTok' : isFacebook ? 'Facebook' : 'Instagram'}</p>
                       <p className="text-sm text-white/90">Click to open original video</p>
                     </div>
                   </a>
