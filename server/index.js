@@ -31,7 +31,9 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://garde-tau.vercel.app'
+    'https://garde-tau.vercel.app',
+    'https://usegarde.com',
+    'https://www.usegarde.com'
   ],
   credentials: true
 }));
@@ -90,7 +92,7 @@ app.get('/', (req, res) => {
       'Shopping lists with smart links',
       'User reviews & ratings system'
     ],
-    frontend: 'https://garde-tau.vercel.app'
+    frontend: process.env.CLIENT_URL || 'https://usegarde.com'
   });
 });
 
