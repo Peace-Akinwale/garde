@@ -29,140 +29,37 @@ async function updateJobStatus(jobId, updates) {
 /**
  * Process a video job in the background
  * This runs asynchronously and updates the database as it progresses
- * Now with LIVE DISCOVERIES for engaging UI!
  */
 export async function processVideoJob(jobId, videoSource, isFile, userId) {
   console.log(`Starting background processing for job ${jobId}`);
 
   try {
-    // Mark as processing - Phase 1: Starting
+    // Mark as processing
     await updateJobStatus(jobId, {
       status: 'processing',
       started_at: new Date().toISOString(),
       progress: 10,
-      current_step: 'Starting analysis...',
-      discoveries: {
-        title: '',
-        ingredients: [],
-        steps: [],
-        metadata: {
-          ingredientCount: 0,
-          stepCount: 0,
-          duration: null,
-          difficulty: null,
-          servings: null
-        }
-      }
+      current_step: 'Downloading video...'
     });
 
-    // Phase 2: Video download/audio extraction
-    await updateJobStatus(jobId, {
-      progress: 25,
-      current_step: isFile ? 'Analyzing video...' : 'Fetching video...'
-    });
+    // Update progress during processing
+    const originalProcessVideo = processVideo;
 
     // Process the video (this is the long-running task)
+    await updateJobStatus(jobId, {
+      progress: 30,
+      current_step: isFile ? 'Extracting audio...' : 'Downloading video...'
+    });
+
     const result = await processVideo(videoSource, isFile, userId);
 
-    // Phase 3: Extraction complete - Stream discoveries incrementally
-    // Simulate streaming by sending ingredients in batches
-    const guide = result.guide;
-    const ingredients = guide.ingredients || [];
-    const steps = guide.steps || [];
-
-    // Send title first (progress: 40%)
+    // Update to transcribing
     await updateJobStatus(jobId, {
-      progress: 40,
-      current_step: 'Extracting details...',
-      discoveries: {
-        title: guide.title || 'Untitled Guide',
-        ingredients: [],
-        steps: [],
-        metadata: {
-          ingredientCount: ingredients.length,
-          stepCount: steps.length,
-          duration: guide.duration,
-          difficulty: guide.difficulty,
-          servings: guide.servings
-        }
-      }
+      progress: 70,
+      current_step: 'Analyzing content...'
     });
 
-    // Send ingredients in batches (progress: 40% → 65%)
-    const ingredientBatchSize = Math.ceil(ingredients.length / 3) || 1;
-    for (let i = 0; i < ingredients.length; i += ingredientBatchSize) {
-      const batch = ingredients.slice(0, i + ingredientBatchSize);
-      const progressPercent = 40 + Math.floor((batch.length / ingredients.length) * 25);
-
-      await updateJobStatus(jobId, {
-        progress: progressPercent,
-        current_step: `Found ${batch.length} ingredients...`,
-        discoveries: {
-          title: guide.title || 'Untitled Guide',
-          ingredients: batch,
-          steps: [],
-          metadata: {
-            ingredientCount: ingredients.length,
-            stepCount: steps.length,
-            duration: guide.duration,
-            difficulty: guide.difficulty,
-            servings: guide.servings
-          }
-        }
-      });
-
-      // Small delay for smoother animation
-      await new Promise(resolve => setTimeout(resolve, 800));
-    }
-
-    // Send steps in batches (progress: 65% → 90%)
-    const stepBatchSize = Math.ceil(steps.length / 3) || 1;
-    for (let i = 0; i < steps.length; i += stepBatchSize) {
-      const batch = steps.slice(0, i + stepBatchSize);
-      const progressPercent = 65 + Math.floor((batch.length / steps.length) * 25);
-
-      await updateJobStatus(jobId, {
-        progress: progressPercent,
-        current_step: `Building step ${batch.length}...`,
-        discoveries: {
-          title: guide.title || 'Untitled Guide',
-          ingredients: ingredients,
-          steps: batch,
-          metadata: {
-            ingredientCount: ingredients.length,
-            stepCount: steps.length,
-            duration: guide.duration,
-            difficulty: guide.difficulty,
-            servings: guide.servings
-          }
-        }
-      });
-
-      // Small delay for smoother animation
-      await new Promise(resolve => setTimeout(resolve, 600));
-    }
-
-    // Phase 4: Final polish (progress: 90% → 100%)
-    await updateJobStatus(jobId, {
-      progress: 95,
-      current_step: 'Finalizing your guide...',
-      discoveries: {
-        title: guide.title || 'Untitled Guide',
-        ingredients: ingredients,
-        steps: steps,
-        metadata: {
-          ingredientCount: ingredients.length,
-          stepCount: steps.length,
-          duration: guide.duration,
-          difficulty: guide.difficulty,
-          servings: guide.servings
-        }
-      }
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Mark as completed with full results
+    // Mark as completed with results
     await updateJobStatus(jobId, {
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -170,19 +67,7 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
       current_step: 'Complete!',
       transcription: result.transcription,
       guide: result.guide,
-      metadata: result.metadata,
-      discoveries: {
-        title: guide.title || 'Untitled Guide',
-        ingredients: ingredients,
-        steps: steps,
-        metadata: {
-          ingredientCount: ingredients.length,
-          stepCount: steps.length,
-          duration: guide.duration,
-          difficulty: guide.difficulty,
-          servings: guide.servings
-        }
-      }
+      metadata: result.metadata
     });
 
     console.log(`✓ Job ${jobId} completed - ${result.guide.title || 'Guide'}`);
@@ -254,7 +139,7 @@ export async function getJobStatus(jobId, userId) {
  */
 export async function getUserJobs(userId, limit = 20, offset = 0) {
   try {
-    const { data, error} = await supabase
+    const { data, error } = await supabase
       .from('processing_jobs')
       .select('*')
       .eq('user_id', userId)

@@ -12,47 +12,25 @@ export default function AuthModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Email validation function
-  const validateEmail = (email) => {
-    const trimmedEmail = email.trim();
-    // RFC 5322 compliant regex for email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmedEmail);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      // Trim and validate email
-      const trimmedEmail = email.trim();
-      const trimmedFullName = fullName.trim();
-
-      // Validate email format
-      if (!validateEmail(trimmedEmail)) {
-        throw new Error('Please enter a valid email address');
-      }
-
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
+          email,
           password,
         });
         if (error) throw error;
       } else {
-        // Additional validation for signup
-        if (!trimmedFullName || trimmedFullName.length < 2) {
-          throw new Error('Please enter your full name (at least 2 characters)');
-        }
-
         const { data, error } = await supabase.auth.signUp({
-          email: trimmedEmail,
+          email,
           password,
           options: {
             data: {
-              full_name: trimmedFullName,
+              full_name: fullName,
             },
           },
         });
@@ -67,8 +45,8 @@ export default function AuthModal({ isOpen, onClose }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 user_id: data.user.id,
-                email: trimmedEmail,
-                full_name: trimmedFullName
+                email: email,
+                full_name: fullName
               })
             });
           } catch (notifError) {
