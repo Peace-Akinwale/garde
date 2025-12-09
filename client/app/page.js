@@ -6,13 +6,14 @@ import { guidesAPI, announcementsAPI } from '@/lib/api';
 import GuideCard from '@/components/GuideCard';
 import GuideListItem from '@/components/GuideListItem';
 import AddGuideModal from '@/components/AddGuideModal';
+import AddArticleModal from '@/components/AddArticleModal';
 import GuideSuccessModal from '@/components/GuideSuccessModal';
 import SearchBar from '@/components/SearchBar';
 import AuthModal from '@/components/AuthModal';
 import NotificationsModal from '@/components/NotificationsModal';
 import Navigation from '@/components/Navigation';
 import ProfileModal from '@/components/ProfileModal';
-import { Plus, LogOut, User, Moon, Sun, Bell, Grid3x3, List } from 'lucide-react';
+import { Plus, LogOut, User, Moon, Sun, Bell, Grid3x3, List, FileText } from 'lucide-react';
 
 
 export default function Home() {
@@ -20,6 +21,7 @@ export default function Home() {
   const [guides, setGuides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showArticleModal, setShowArticleModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -117,6 +119,7 @@ export default function Home() {
       loadGuides(user.id);
     }
     setShowAddModal(false);
+    setShowArticleModal(false);
     // Show success modal with celebration and smart review CTA
     setShowSuccessModal(true);
   };
@@ -291,11 +294,18 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2
-rounded-lg hover:bg-primary-600 transition"
+                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
               >
                 <Plus size={20} />
                 <span className="hidden sm:inline">Add Guide</span>
+              </button>
+              <button
+                onClick={() => setShowArticleModal(true)}
+                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                title="Add guide from article or blog"
+              >
+                <FileText size={20} />
+                <span className="hidden sm:inline">Add Article</span>
               </button>
               <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg
 p-1">
@@ -409,6 +419,16 @@ p-1">
         <AddGuideModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
+          onGuideAdded={handleGuideAdded}
+          userId={user.id}
+        />
+      )}
+
+      {/* Add Article Modal */}
+      {showArticleModal && (
+        <AddArticleModal
+          isOpen={showArticleModal}
+          onClose={() => setShowArticleModal(false)}
           onGuideAdded={handleGuideAdded}
           userId={user.id}
         />

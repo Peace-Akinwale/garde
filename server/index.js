@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import videoRoutes from './routes/video.js';
+import articleRoutes from './routes/article.js';
 import guideRoutes from './routes/guides.js';
 import webhookRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin.js';
@@ -112,6 +113,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/video', videoRoutes);
+app.use('/api/article', articleRoutes);
 app.use('/api/guides', guideRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);

@@ -61,6 +61,19 @@ export const videoAPI = {
   },
 };
 
+export const articleAPI = {
+  /**
+   * Process article URL and extract guide
+   * Returns immediately with processed guide (faster than video)
+   */
+  processUrl: async (url, userId) => {
+    const response = await api.post('/api/article/process', { url, userId }, {
+      timeout: 60000, // 60 second timeout (article processing is faster than video)
+    });
+    return response.data;
+  },
+};
+
 export const guidesAPI = {
   /**
    * Get all guides for a user

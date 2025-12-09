@@ -468,8 +468,33 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
             </div>
           )}
 
-          {/* Video Player */}
+          {/* Source (Video or Article) */}
           {guide.source_url && (() => {
+            // Check if this is an article
+            const isArticle = guide.source_type === 'article';
+
+            if (isArticle) {
+              // Show article link
+              return (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Original Article</h3>
+                  <a
+                    href={guide.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-3 p-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg transition shadow-lg"
+                  >
+                    <Book size={24} />
+                    <div className="text-left">
+                      <p className="font-semibold">Read Original Article</p>
+                      <p className="text-sm text-white/90">Click to open source</p>
+                    </div>
+                  </a>
+                </div>
+              );
+            }
+
+            // Video source logic
             const isTikTok = guide.source_url.includes('tiktok.com');
             const isInstagram = guide.source_url.includes('instagram.com');
             const isTwitter = guide.source_url.includes('twitter.com') || guide.source_url.includes('x.com');
