@@ -2,14 +2,50 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, ShoppingCart, User, Bell, Menu, X, Settings, LogOut, Shield, Star, Trash2 } from 'lucide-react';
+import { Home, ShoppingCart, User, Bell, Menu, X, Settings, LogOut, Shield, Star, Trash2, Moon, Sun } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-export default function Navigation({ user, onLogout, onProfileClick }) {
+export default function Navigation({ 
+  user, 
+  onLogout, 
+  onProfileClick,
+  darkMode: externalDarkMode,
+  onToggleDarkMode: externalToggleDarkMode,
+  hasUnseenNotifications = false,
+  onOpenNotifications
+}) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [internalDarkMode, setInternalDarkMode] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Use external dark mode if provided, otherwise use internal state
+  const darkMode = externalDarkMode !== undefined ? externalDarkMode : internalDarkMode;
+  
+  // Initialize dark mode from localStorage
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    setInternalDarkMode(savedDarkMode);
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    if (externalToggleDarkMode) {
+      externalToggleDarkMode();
+    } else {
+      const newDarkMode = !internalDarkMode;
+      setInternalDarkMode(newDarkMode);
+      localStorage.setItem('darkMode', newDarkMode.toString());
+      if (newDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  };
 
   useEffect(() => {
     checkAdminStatus();
@@ -122,6 +158,20 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
 
         {/* Navigation Menu */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          {/* Announcements Button - Prominent at top */}
+          {onOpenNotifications && (
+            <button
+              onClick={onOpenNotifications}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 relative"
+            >
+              <Bell size={20} />
+              <span className="font-medium">What's New</span>
+              {hasUnseenNotifications && (
+                <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </button>
+          )}
+
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -142,8 +192,19 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
           })}
         </nav>
 
-        {/* Logout Button */}
-        <div className="p-3 border-t border-gray-200 dark:border-slate-700">
+        {/* Dark Mode & Logout */}
+        <div className="p-3 border-t border-gray-200 dark:border-slate-700 space-y-2">
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={toggleDarkMode}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition"
+            title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            <span className="font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+          
+          {/* Logout Button */}
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
@@ -214,6 +275,23 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
 
             {/* Mobile Navigation Menu */}
             <nav className="px-3 py-4">
+              {/* Announcements Button - Prominent at top */}
+              {onOpenNotifications && (
+                <button
+                  onClick={() => {
+                    onOpenNotifications?.();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 relative"
+                >
+                  <Bell size={20} />
+                  <span className="font-medium">What's New</span>
+                  {hasUnseenNotifications && (
+                    <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </button>
+              )}
+
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path);
@@ -234,8 +312,19 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
               })}
             </nav>
 
-            {/* Mobile Logout */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200 dark:border-slate-700">
+            {/* Mobile Dark Mode & Logout */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200 dark:border-slate-700 space-y-2 bg-white dark:bg-slate-800">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition"
+                title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                <span className="font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
+              
+              {/* Logout Button */}
               <button
                 onClick={() => {
                   onLogout?.();
