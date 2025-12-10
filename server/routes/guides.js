@@ -17,6 +17,7 @@ let query = supabase
     .from('guides')
     .select('*')
     .eq('user_id', userId)
+    .eq('is_deleted', false)
     .order('pinned', { ascending: false })
     .order('pinned_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
@@ -317,7 +318,8 @@ router.get('/stats/:userId', async (req, res) => {
     const { data, error } = await supabase
       .from('guides')
       .select('type, category')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('is_deleted', false);
 
     if (error) throw error;
 

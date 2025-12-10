@@ -34,8 +34,10 @@ export default function NotificationsModal({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       fetchAnnouncements();
-      // Mark as viewed in localStorage
-      localStorage.setItem('lastViewedAnnouncements', new Date().toISOString());
+      // Mark as viewed when modal opens - this will be called by parent component too
+      // but having it here ensures it's always updated
+      const now = new Date().toISOString();
+      localStorage.setItem('lastViewedAnnouncements', now);
     }
   }, [isOpen]);
 

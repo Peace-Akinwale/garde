@@ -14,6 +14,7 @@ import {
   Video,
   ShoppingCart,
   Pin,
+  CheckSquare,
 } from 'lucide-react';
 import GuideDetailModal from './GuideDetailModal';
 import ShoppingListSelector from './ShoppingListSelector';
@@ -60,7 +61,14 @@ const difficultyColors = {
   hard: 'text-red-600 dark:text-red-400',
 };
 
-export default function GuideListItem({ guide, onDeleted, userId }) {
+export default function GuideListItem({ 
+  guide, 
+  onDeleted, 
+  userId,
+  isSelectionMode = false,
+  isSelected = false,
+  onToggleSelection
+}) {
   const [showDetail, setShowDetail] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showShoppingSelector, setShowShoppingSelector] = useState(false);
@@ -102,13 +110,44 @@ export default function GuideListItem({ guide, onDeleted, userId }) {
     }
   };
 
+  const handleClick = (e) => {
+    if (isSelectionMode) {
+      e.stopPropagation();
+      if (onToggleSelection) {
+        onToggleSelection();
+      }
+      return;
+    }
+    setShowDetail(true);
+  };
+
   return (
     <>
       <div
-        onClick={() => setShowDetail(true)}
-        className="bg-white dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 p-4 cursor-pointer hover:shadow-md transition-shadow"
+        onClick={handleClick}
+        className={`bg-white dark:bg-slate-700 rounded-lg border ${
+          isSelected ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' : 'border-gray-200 dark:border-slate-600'
+        } p-4 cursor-pointer hover:shadow-md transition-shadow`}
       >
         <div className="flex items-start gap-4">
+          {/* Checkbox (Selection Mode) */}
+          {isSelectionMode && (
+            <div className="flex-shrink-0 pt-1">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (onToggleSelection) {
+                    onToggleSelection();
+                  }
+                }}
+                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+
           {/* Left: Type Icon */}
           <div className={`flex items-center justify-center w-12 h-12 rounded-lg ${badgeColor} flex-shrink-0`}>
             <Icon size={24} />
@@ -177,39 +216,41 @@ export default function GuideListItem({ guide, onDeleted, userId }) {
             </div>
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePin}
-                disabled={pinning}
-                className={`transition disabled:opacity-50 ${isPinned ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'}`}
-                title={isPinned ? 'Unpin guide' : 'Pin guide'}
-              >
-                <Pin size={16} fill={isPinned ? 'currentColor' : 'none'} />
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
-                title="Delete guide"
-              >
-                <Trash2 size={16} />
-              </button>
+          {/* Right: Actions (hidden in selection mode) */}
+          {!isSelectionMode && (
+            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePin}
+                  disabled={pinning}
+                  className={`transition disabled:opacity-50 ${isPinned ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'}`}
+                  title={isPinned ? 'Unpin guide' : 'Pin guide'}
+                >
+                  <Pin size={16} fill={isPinned ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-gray-400 hover:text-red-500 transition disabled:opacity-50"
+                  title="Delete guide"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              {guide.ingredients && guide.ingredients.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowShoppingSelector(true);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-lg transition"
+                >
+                  <ShoppingCart size={14} />
+                  Add
+                </button>
+              )}
             </div>
-            {guide.ingredients && guide.ingredients.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowShoppingSelector(true);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-lg transition"
-              >
-                <ShoppingCart size={14} />
-                Add
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 

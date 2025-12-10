@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, ShoppingCart, User, Bell, Menu, X, Settings, LogOut, Shield, Star } from 'lucide-react';
+import { Home, ShoppingCart, User, Bell, Menu, X, Settings, LogOut, Shield, Star, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function Navigation({ user, onLogout, onProfileClick }) {
@@ -35,6 +35,7 @@ export default function Navigation({ user, onLogout, onProfileClick }) {
     { icon: Home, label: 'Home', path: '/' },
     { icon: ShoppingCart, label: 'Shopping Lists', path: '/shopping' },
     { icon: Star, label: 'Reviews', path: '/reviews' },
+    { icon: Trash2, label: 'Trash', path: '/trash' },
     // { icon: Bell, label: 'Reminders', path: '/reminders' }, // Disabled for now
     { icon: User, label: 'Profile', path: '/profile' }
   ];

@@ -13,7 +13,9 @@ import AuthModal from '@/components/AuthModal';
 import NotificationsModal from '@/components/NotificationsModal';
 import Navigation from '@/components/Navigation';
 import ProfileModal from '@/components/ProfileModal';
-import { Plus, LogOut, User, Moon, Sun, Bell, Grid3x3, List, FileText } from 'lucide-react';
+import { Plus, LogOut, User, Moon, Sun, Bell, Grid3x3, List, FileText, CheckSquare, Trash2, X } from 'lucide-react';
+import { bulkMoveToTrash } from '@/lib/trashActions';
+import BulkActionToolbar from '@/components/BulkActionToolbar';
 
 
 export default function Home() {
@@ -29,6 +31,8 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   const [hasUnseenNotifications, setHasUnseenNotifications] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedGuides, setSelectedGuides] = useState(new Set());
   const [filters, setFilters] = useState({
     search: '',
     type: 'all',
@@ -56,6 +60,7 @@ export default function Home() {
     setHasUnseenNotifications(!seenNotifications);
 
     checkUser();
+    checkForNewAnnouncements();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -156,14 +161,17 @@ export default function Home() {
       const lastViewed = localStorage.getItem('lastViewedAnnouncements');
       
       if (!lastViewed) {
-        // Never viewed before
-        setHasUnseenNotifications(true);
+        // Never viewed before - show red dot if there are any announcements
+        setHasUnseenNotifications(announcements.length > 0);
         return;
       }
 
       // Check if there are announcements newer than last viewed
       const lastViewedDate = new Date(lastViewed);
-      const hasNew = announcements.some(a => new Date(a.date) > lastViewedDate);
+      const hasNew = announcements.some(a => {
+        const announcementDate = new Date(a.date);
+        return announcementDate > lastViewedDate;
+      });
       setHasUnseenNotifications(hasNew);
     } catch (error) {
       console.error('Error checking for new announcements:', error);
@@ -173,8 +181,10 @@ export default function Home() {
 
   const handleOpenNotifications = () => {
     setShowNotifications(true);
+    // Mark current time as last viewed when opening notifications
+    const now = new Date().toISOString();
+    localStorage.setItem('lastViewedAnnouncements', now);
     setHasUnseenNotifications(false);
-    localStorage.setItem('seenNotifications', 'true');
   };
 
   const handleProfileClick = () => {
@@ -187,6 +197,64 @@ export default function Home() {
       data: { session },
     } = await supabase.auth.getSession();
     setUser(session?.user ?? null);
+  };
+
+  // Bulk selection handlers
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedGuides(new Set());
+  };
+
+  const toggleGuideSelection = (guideId) => {
+    const newSelection = new Set(selectedGuides);
+    if (newSelection.has(guideId)) {
+      newSelection.delete(guideId);
+    } else {
+      newSelection.add(guideId);
+    }
+    setSelectedGuides(newSelection);
+  };
+
+  const selectAllGuides = () => {
+    setSelectedGuides(new Set(guides.map(g => g.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedGuides(new Set());
+    setIsSelectionMode(false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedGuides.size === 0) {
+      alert('Please select guides to delete');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Delete ${selectedGuides.size} guide(s)?\n\nYou can restore them from trash within 7 days.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const guideIds = Array.from(selectedGuides);
+      const result = await bulkMoveToTrash(guideIds);
+
+      if (result.success) {
+        // Reload guides
+        if (user) {
+          await loadGuides(user.id);
+        }
+        setSelectedGuides(new Set());
+        setIsSelectionMode(false);
+        alert(`✅ Deleted ${result.deleted_count} guide(s). You can restore them from trash within 7 days.`);
+      } else {
+        alert(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error bulk deleting guides:', error);
+      alert(`❌ Error: ${error.message || 'Failed to delete guides'}`);
+    }
   };
 
   // Double-swipe to exit handlers
@@ -307,6 +375,22 @@ export default function Home() {
                 <FileText size={20} />
                 <span className="hidden sm:inline">Add Article</span>
               </button>
+              {guides.length > 0 && (
+                <button
+                  onClick={toggleSelectionMode}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                    isSelectionMode
+                      ? 'bg-primary-600 text-white hover:bg-primary-700'
+                      : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                  }`}
+                  title="Select multiple guides"
+                >
+                  <CheckSquare size={20} />
+                  <span className="hidden sm:inline">
+                    {isSelectionMode ? 'Cancel' : 'Select'}
+                  </span>
+                </button>
+              )}
               <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg
 p-1">
                 <button
@@ -351,6 +435,23 @@ p-1">
           </div>
         </div>
       </header>
+
+      {/* Bulk Action Toolbar */}
+      {isSelectionMode && (
+        <BulkActionToolbar
+          selectedGuides={selectedGuides}
+          onClearSelection={clearSelection}
+          onSelectAll={selectAllGuides}
+          onActionComplete={async () => {
+            if (user) {
+              await loadGuides(user.id);
+            }
+            setSelectedGuides(new Set());
+            setIsSelectionMode(false);
+          }}
+          totalGuides={guides.length}
+        />
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -397,6 +498,9 @@ p-1">
                 guide={guide}
                 userId={user.id}
                 onDeleted={handleGuideDeleted}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedGuides.has(guide.id)}
+                onToggleSelection={() => toggleGuideSelection(guide.id)}
               />
             ))}
           </div>
@@ -408,6 +512,9 @@ p-1">
                 guide={guide}
                 userId={user.id}
                 onDeleted={handleGuideDeleted}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedGuides.has(guide.id)}
+                onToggleSelection={() => toggleGuideSelection(guide.id)}
               />
             ))}
           </div>

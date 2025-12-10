@@ -17,6 +17,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import AnnouncementManager from '@/components/AnnouncementManager';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -277,6 +278,11 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Announcements Management */}
+        <div className="mt-8 bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
+          <AnnouncementManager />
         </div>
       </div>
     </div>

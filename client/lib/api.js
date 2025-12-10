@@ -311,6 +311,72 @@ export const announcementsAPI = {
     const response = await api.get('/api/announcements');
     return response.data;
   },
+  /**
+   * Create a new announcement (admin only)
+   */
+  create: async (announcement, userId) => {
+    const response = await api.post('/api/announcements', {
+      ...announcement,
+      userId
+    }, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+  /**
+   * Update an announcement (admin only)
+   */
+  update: async (id, announcement, userId) => {
+    const response = await api.put(`/api/announcements/${id}`, {
+      ...announcement,
+      userId
+    }, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+  /**
+   * Delete an announcement (admin only)
+   */
+  delete: async (id, userId) => {
+    const response = await api.delete(`/api/announcements/${id}`, {
+      headers: { 'x-user-id': userId },
+      data: { userId }
+    });
+    return response.data;
+  },
+};
+
+export const autoAnnouncementsAPI = {
+  /**
+   * Get available features that can auto-create announcements
+   */
+  getFeatures: async (userId) => {
+    const response = await api.get('/api/auto-announcements/features', {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+  /**
+   * Create announcement for a specific feature
+   */
+  create: async (featureKey, userId) => {
+    const response = await api.post('/api/auto-announcements/create', {
+      featureKey
+    }, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
+  /**
+   * Sync all features - creates announcements for any missing ones
+   */
+  sync: async (userId) => {
+    const response = await api.post('/api/auto-announcements/sync', {}, {
+      headers: { 'x-user-id': userId }
+    });
+    return response.data;
+  },
 };
 
 export default api;
