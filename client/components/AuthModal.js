@@ -2,28 +2,42 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { X } from 'lucide-react';
+import { X, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        // Handle password reset request
+        const redirectUrl = `${window.location.origin}/auth/reset-password`;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: redirectUrl,
+        });
+        if (error) throw error;
+        setSuccess('Password reset email sent! Please check your inbox.');
+        setEmail('');
+      } else if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        onClose();
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -54,9 +68,8 @@ export default function AuthModal({ isOpen, onClose }) {
             // Don't block user signup if notification fails
           }
         }
+        onClose();
       }
-
-      onClose();
     } catch (error) {
       setError(error.message);
     } finally {
@@ -81,7 +94,11 @@ export default function AuthModal({ isOpen, onClose }) {
             Garde
           </h2>
           <p className="text-gray-500">
-            {isLogin ? 'Welcome back!' : 'Create your account'}
+            {isForgotPassword 
+              ? 'Reset your password' 
+              : isLogin 
+                ? 'Welcome back!' 
+                : 'Create your account'}
           </p>
         </div>
 
@@ -91,8 +108,14 @@ export default function AuthModal({ isOpen, onClose }) {
           </div>
         )}
 
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-600">{success}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
+          {!isLogin && !isForgotPassword && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Full Name
@@ -122,42 +145,97 @@ export default function AuthModal({ isOpen, onClose }) {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
-              placeholder="Enter your password (min 6 characters)"
-              required
-              minLength={6}
-            />
-          </div>
+          {!isForgotPassword && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 pr-10 text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+                  placeholder="Enter your password (min 6 characters)"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isForgotPassword && (
+            <p className="text-sm text-gray-600 text-center">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-primary-500 text-white py-3 rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {loading ? 'Please wait...' : isLogin ? 'Login' : 'Sign Up'}
+            {loading 
+              ? 'Please wait...' 
+              : isForgotPassword 
+                ? 'Send Reset Link' 
+                : isLogin 
+                  ? 'Login' 
+                  : 'Sign Up'}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError(null);
-            }}
-            className="text-sm text-primary-500 hover:text-primary-600"
-          >
-            {isLogin
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Login'}
-          </button>
+        <div className="mt-6 text-center space-y-2">
+          {isForgotPassword ? (
+            <button
+              onClick={() => {
+                setIsForgotPassword(false);
+                setError(null);
+                setSuccess(null);
+              }}
+              className="text-sm text-primary-500 hover:text-primary-600"
+            >
+              Back to Login
+            </button>
+          ) : (
+            <>
+              {isLogin && (
+                <div>
+                  <button
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setError(null);
+                      setSuccess(null);
+                    }}
+                    className="text-sm text-primary-500 hover:text-primary-600"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setIsForgotPassword(false);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className="text-sm text-primary-500 hover:text-primary-600 block w-full"
+              >
+                {isLogin
+                  ? "Don't have an account? Sign up"
+                  : 'Already have an account? Login'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
