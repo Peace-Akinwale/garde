@@ -355,8 +355,37 @@ export default function Home() {
 
         {/* Header */}
         <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-16 lg:top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          {/* Mobile: Stacked layout */}
+          <div className="lg:hidden space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">Garde</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Your personal recipe & guide keeper
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2.5 rounded-lg hover:bg-primary-600 transition text-sm font-medium w-full"
+              >
+                <Plus size={18} />
+                <span>Add Guide</span>
+              </button>
+              <button
+                onClick={() => setShowArticleModal(true)}
+                className="flex items-center justify-center gap-2 bg-blue-500 text-white px-4 py-2.5 rounded-lg hover:bg-blue-600 transition text-sm font-medium w-full"
+              >
+                <FileText size={18} />
+                <span>Add Article</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop: Horizontal layout */}
+          <div className="hidden lg:flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">Garde</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -367,9 +396,10 @@ export default function Home() {
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
+                title="Add a new guide or recipe"
               >
                 <Plus size={20} />
-                <span className="hidden sm:inline">Add Guide</span>
+                <span>Add Guide</span>
               </button>
               <button
                 onClick={() => setShowArticleModal(true)}
@@ -377,7 +407,7 @@ export default function Home() {
                 title="Add guide from article or blog"
               >
                 <FileText size={20} />
-                <span className="hidden sm:inline">Add Article</span>
+                <span>Add Article</span>
               </button>
               {guides.length > 0 && (
                 <button
@@ -390,9 +420,7 @@ export default function Home() {
                   title="Select multiple guides"
                 >
                   <CheckSquare size={20} />
-                  <span className="hidden sm:inline">
-                    {isSelectionMode ? 'Cancel' : 'Select'}
-                  </span>
+                  <span>{isSelectionMode ? 'Cancel' : 'Select'}</span>
                 </button>
               )}
               <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
@@ -414,8 +442,41 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Mobile: Additional Actions Row */}
+          <div className="lg:hidden flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-slate-700">
+            {guides.length > 0 && (
+              <button
+                onClick={toggleSelectionMode}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition text-sm ${
+                  isSelectionMode
+                    ? 'bg-primary-600 text-white hover:bg-primary-700'
+                    : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                <CheckSquare size={18} />
+                <span>{isSelectionMode ? 'Cancel' : 'Select'}</span>
+              </button>
+            )}
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1 ml-auto">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                title="Grid View"
+              >
+                <Grid3x3 size={16} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                title="List View"
+              >
+                <List size={16} />
+              </button>
+            </div>
+          </div>
+
           {/* Search and Filters */}
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             <SearchBar filters={filters} onFiltersChange={setFilters} />
           </div>
         </div>
