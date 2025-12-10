@@ -351,86 +351,88 @@ export default function Home() {
 
         {/* Header */}
         <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-16 lg:top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">Garde</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-primary-600 dark:text-primary-400 truncate">Garde</h1>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                 Your personal recipe & guide keeper
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
+              {/* Primary Actions - Always visible */}
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
+                className="flex items-center gap-1.5 sm:gap-2 bg-primary-500 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-primary-600 transition text-sm sm:text-base"
+                title="Add Guide"
               >
-                <Plus size={20} />
-                <span className="hidden sm:inline">Add Guide</span>
+                <Plus size={18} className="sm:w-5 sm:h-5" />
+                <span className="hidden md:inline">Add Guide</span>
               </button>
               <button
                 onClick={() => setShowArticleModal(true)}
-                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                className="flex items-center gap-1.5 sm:gap-2 bg-blue-500 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-blue-600 transition text-sm sm:text-base"
                 title="Add guide from article or blog"
               >
-                <FileText size={20} />
-                <span className="hidden sm:inline">Add Article</span>
+                <FileText size={18} className="sm:w-5 sm:h-5" />
+                <span className="hidden md:inline">Add Article</span>
               </button>
               {guides.length > 0 && (
                 <button
                   onClick={toggleSelectionMode}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition text-sm sm:text-base ${
                     isSelectionMode
                       ? 'bg-primary-600 text-white hover:bg-primary-700'
                       : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                   }`}
-                  title="Select multiple guides"
+                  title={isSelectionMode ? "Cancel selection" : "Select multiple guides"}
                 >
-                  <CheckSquare size={20} />
-                  <span className="hidden sm:inline">
+                  <CheckSquare size={18} className="sm:w-5 sm:h-5" />
+                  <span className="hidden lg:inline">
                     {isSelectionMode ? 'Cancel' : 'Select'}
                   </span>
                 </button>
               )}
-              <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg
-p-1">
+              {/* Secondary Actions - Grouped in compact view */}
+              <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-0.5 sm:p-1">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                  className={`p-1 sm:p-1.5 sm:p-2 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
                   title="Grid View"
                 >
-                  <Grid3x3 size={18} />
+                  <Grid3x3 size={14} className="sm:w-4 sm:h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                  className={`p-1 sm:p-1.5 sm:p-2 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
                   title="List View"
                 >
-                  <List size={18} />
+                  <List size={14} className="sm:w-4 sm:h-4" />
                 </button>
               </div>
               <button
                 onClick={handleOpenNotifications}
-                className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition relative"
+                className="p-1.5 sm:p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition relative"
                 title="What's New"
               >
-                <Bell size={20} />
+                <Bell size={18} className="sm:w-5 sm:h-5" />
                 {/* New updates indicator */}
                 {hasUnseenNotifications && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                  <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
                 )}
               </button>
               <button
                 onClick={toggleDarkMode}
-                className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                className="p-1.5 sm:p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
-                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                {darkMode ? <Sun size={18} className="sm:w-5 sm:h-5" /> : <Moon size={18} className="sm:w-5 sm:h-5" />}
               </button>
             </div>
           </div>
 
           {/* Search and Filters */}
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             <SearchBar filters={filters} onFiltersChange={setFilters} />
           </div>
         </div>
@@ -454,7 +456,7 @@ p-1">
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
@@ -491,7 +493,7 @@ p-1">
             </button>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {guides.map((guide) => (
               <GuideCard
                 key={guide.id}
@@ -505,7 +507,7 @@ p-1">
             ))}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {guides.map((guide) => (
               <GuideListItem
                 key={guide.id}

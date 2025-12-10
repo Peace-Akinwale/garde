@@ -49,3 +49,6 @@ coverage/
 # Misc
 .vercel
 .render
+
+# Accidental nul files (Windows special device name)
+**/nul

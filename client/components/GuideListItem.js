@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { guidesAPI } from '@/lib/api';
+import { moveToTrash } from '@/lib/trashActions';
 import {
   ChefHat,
   Hammer,
@@ -80,12 +81,21 @@ export default function GuideListItem({
 
   const handleDelete = async (e) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this guide?')) return;
+    const confirmed = confirm(
+      `Delete "${guide.title}"?\n\nYou can restore it from trash within 7 days.`
+    );
+
+    if (!confirmed) return;
 
     try {
       setDeleting(true);
-      await guidesAPI.delete(guide.id);
-      onDeleted();
+      const result = await moveToTrash(guide.id);
+
+      if (result.success) {
+        onDeleted();
+      } else {
+        alert(`Error: ${result.error}`);
+      }
     } catch (error) {
       console.error('Error deleting guide:', error);
       alert('Failed to delete guide');
