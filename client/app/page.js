@@ -364,15 +364,14 @@ export default function Home() {
                 {guides.length > 0 && (
                   <button
                     onClick={toggleSelectionMode}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition text-sm ${
+                    className={`p-2 rounded-lg transition ${
                       isSelectionMode
                         ? 'bg-primary-600 text-white hover:bg-primary-700'
                         : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                     }`}
-                    title="Select multiple guides"
+                    title={isSelectionMode ? "Cancel Selection" : "Select multiple guides"}
                   >
                     <CheckSquare size={18} />
-                    <span>{isSelectionMode ? 'Cancel' : 'Select'}</span>
                   </button>
                 )}
                 <button
@@ -405,15 +404,14 @@ export default function Home() {
               {guides.length > 0 && (
                 <button
                   onClick={toggleSelectionMode}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                  className={`p-2 rounded-lg transition ${
                     isSelectionMode
                       ? 'bg-primary-600 text-white hover:bg-primary-700'
                       : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                   }`}
-                  title="Select multiple guides"
+                  title={isSelectionMode ? "Cancel Selection" : "Select multiple guides"}
                 >
                   <CheckSquare size={20} />
-                  <span>{isSelectionMode ? 'Cancel' : 'Select'}</span>
                 </button>
               )}
               <button
