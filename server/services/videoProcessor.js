@@ -1,5 +1,4 @@
 import ffmpeg from 'fluent-ffmpeg';
-import ytdl from '@distube/ytdl-core';
 import axios from 'axios';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
@@ -16,11 +15,13 @@ const __dirname = path.dirname(__filename);
 
 // Configure FFmpeg and yt-dlp paths for production (Render)
 let ytDlpPath = 'yt-dlp'; // default to system yt-dlp
+let ytDlpCookiesPath = null; // optional cookies file for YouTube auth
 
 if (process.env.NODE_ENV === 'production') {
   const ffmpegPath = path.join(__dirname, '..', 'ffmpeg-bin', 'ffmpeg');
   const ffprobePath = path.join(__dirname, '..', 'ffmpeg-bin', 'ffprobe');
   const localYtDlpPath = path.join(__dirname, '..', 'yt-dlp-bin', 'yt-dlp');
+  const localCookiesPath = path.join(__dirname, '..', 'yt-dlp-bin', 'cookies.txt');
 
   if (fs.existsSync(ffmpegPath)) {
     ffmpeg.setFfmpegPath(ffmpegPath);
@@ -32,7 +33,22 @@ if (process.env.NODE_ENV === 'production') {
     ytDlpPath = localYtDlpPath;
     console.log('✓ Using local yt-dlp binary for production');
   }
+
+  // Check for cookies file (enables YouTube auth bypass)
+  if (fs.existsSync(localCookiesPath)) {
+    ytDlpCookiesPath = localCookiesPath;
+    console.log('✓ YouTube cookies file found - auth bypass enabled');
+  }
 }
+
+// Allow env var override for cookies path (local dev or custom setup)
+if (process.env.YTDLP_COOKIES_PATH && fs.existsSync(process.env.YTDLP_COOKIES_PATH)) {
+  ytDlpCookiesPath = process.env.YTDLP_COOKIES_PATH;
+  console.log('✓ Using custom cookies path from YTDLP_COOKIES_PATH env var');
+}
+
+// Geo-bypass toggle (helps with region-restricted videos)
+const enableGeoBypass = process.env.YTDLP_GEO_BYPASS === 'true';
 
 /**
  * Check if URL is a TikTok photo post (carousel/slideshow)
@@ -268,39 +284,100 @@ async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
 }
 
 /**
+ * Build yt-dlp command options based on platform and config
+ */
+function buildYtDlpOptions(url) {
+  const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+  const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
+  const isInstagram = url.includes('instagram.com');
+
+  // Base options for all platforms (hardened for reliability)
+  const baseFlags = [
+    '--no-playlist',           // Don't download playlists
+    '--no-warnings',           // Suppress warnings
+    '--ignore-config',         // Ignore any local config files
+    '--no-check-certificates', // Skip SSL verification (some servers have issues)
+    '--extractor-retries', '5',    // Retry extraction 5 times
+    '--fragment-retries', '5',     // Retry fragments 5 times  
+    '--retries', '5',              // General retries
+    '--buffer-size', '16K',        // Buffer size for downloads
+  ];
+
+  // Modern browser user agent (helps avoid bot detection)
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+  baseFlags.push('--user-agent', `"${userAgent}"`);
+
+  // Add cookies if available (helps with YouTube auth/rate-limits)
+  if (ytDlpCookiesPath) {
+    baseFlags.push('--cookies', `"${ytDlpCookiesPath}"`);
+    console.log('Using cookies file for authentication');
+  }
+
+  // Geo-bypass if enabled (helps with region-restricted content)
+  if (enableGeoBypass) {
+    baseFlags.push('--geo-bypass');
+    console.log('Geo-bypass enabled');
+  }
+
+  let formatString, timeout, platformName;
+
+  if (isYouTube) {
+    platformName = 'YouTube';
+    // YouTube format: prefer mp4 video + m4a audio, fallback to best combined
+    // This ensures we get a format FFmpeg can process
+    // No rate limiting or quality restrictions - let it download at full speed
+    formatString = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best';
+    timeout = 120000; // 2 minutes for YouTube (same as other platforms)
+    
+    console.log('Applying YouTube-specific options (2min timeout, no rate limit)');
+    
+  } else if (isTikTok) {
+    platformName = 'TikTok';
+    formatString = 'best[ext=mp4]/best';
+    timeout = 120000; // 2 minutes for TikTok
+    console.log('Applying TikTok-specific options (2min timeout)');
+    
+  } else if (isInstagram) {
+    platformName = 'Instagram';
+    formatString = 'best[ext=mp4]/best';
+    timeout = 120000; // 2 minutes for Instagram
+    console.log('Applying Instagram-specific options (2min timeout)');
+    
+  } else {
+    platformName = 'video source';
+    formatString = 'best[ext=mp4]/best';
+    timeout = 90000; // 90 seconds for other platforms
+  }
+
+  baseFlags.push('-f', `"${formatString}"`);
+
+  return { flags: baseFlags, timeout, platformName };
+}
+
+/**
  * Download video using yt-dlp (works for TikTok, YouTube, Instagram, etc.)
+ * Hardened with retries, rate limiting, and comprehensive error handling
  */
 async function downloadWithYtDlp(url, outputPath) {
   try {
     console.log('Using yt-dlp to download:', url);
 
-    // TikTok-specific options to avoid blocks and hangs
-    const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
-
-    let baseOptions, timeout;
-
-    if (isTikTok) {
-      // TikTok-specific options with more aggressive settings
-      baseOptions = '--no-check-certificate --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --extractor-retries 3 --fragment-retries 3 -f "best[ext=mp4]/best" --no-playlist -o';
-      timeout = 120000; // 2 minutes for TikTok (they're slower)
-      console.log('Applying TikTok-specific download options (120s timeout, 3 retries)');
-    } else {
-      baseOptions = '-f "best[ext=mp4]/best" --no-playlist -o';
-      timeout = 90000; // 90 seconds for other platforms
-    }
-
-    const command = `"${ytDlpPath}" ${baseOptions} "${outputPath}" "${url}"`;
+    const { flags, timeout, platformName } = buildYtDlpOptions(url);
+    
+    // Build the full command
+    const command = `"${ytDlpPath}" ${flags.join(' ')} -o "${outputPath}" "${url}"`;
 
     console.log('Executing yt-dlp...');
-    console.log('Command:', command);
+    console.log('Command (truncated):', command.substring(0, 300) + '...');
 
     // Execute with timeout
     const { stdout, stderr } = await execPromise(command, {
       timeout,
       killSignal: 'SIGKILL',
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large outputs
     });
 
-    // Log all output for debugging
+    // Log output for debugging (truncated)
     if (stdout) console.log('yt-dlp stdout:', stdout.substring(0, 500));
     if (stderr) console.log('yt-dlp stderr:', stderr.substring(0, 500));
 
@@ -310,135 +387,123 @@ async function downloadWithYtDlp(url, outputPath) {
       if (stats.size === 0) {
         throw new Error('Downloaded file is empty');
       }
-      console.log(`✓ yt-dlp download complete: ${stats.size} bytes`);
+      console.log(`✓ yt-dlp download complete: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
       return outputPath;
     } catch (statError) {
       throw new Error('Video file was not created - download may have failed silently');
     }
 
   } catch (error) {
+    // Re-extract platform name for error messages
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
+    const platformName = isYouTube ? 'YouTube' : (isTikTok ? 'TikTok' : 'video source');
+
     console.error('yt-dlp failed:', {
       message: error.message,
       killed: error.killed,
       signal: error.signal,
       code: error.code,
-      stderr: error.stderr?.substring(0, 500),
-      stdout: error.stdout?.substring(0, 500)
+      stderr: error.stderr?.substring(0, 800),
+      stdout: error.stdout?.substring(0, 300)
     });
 
-    // Provide specific error messages
+    const stderrText = error.stderr || '';
+    const stdoutText = error.stdout || '';
+    const combinedOutput = stderrText + stdoutText;
+
+    // Timeout errors
     if (error.killed || error.signal === 'SIGKILL') {
-      throw new Error('Download timeout - TikTok/video source is blocking or too slow. Please download the video to your device and use "Upload File" instead.');
+      throw new Error(`Download timeout - ${platformName} took too long. Please download the video to your device and use "Upload File" instead.`);
     }
 
-    if (error.stderr && error.stderr.includes('429')) {
-      throw new Error('Too many requests - TikTok has rate-limited this server. Please try again in a few minutes or use "Upload File".');
+    // Rate limiting (429)
+    if (combinedOutput.includes('429') || combinedOutput.includes('Too Many Requests')) {
+      throw new Error(`Too many requests - ${platformName} has rate-limited this server. Please try again in 10-15 minutes or use "Upload File".`);
     }
 
-    if (error.stderr && error.stderr.includes('403')) {
-      throw new Error('Access forbidden - TikTok is blocking downloads from this server. Please use "Upload File" instead.');
+    // Access forbidden (403)
+    if (combinedOutput.includes('403') || combinedOutput.includes('Forbidden')) {
+      throw new Error(`Access forbidden - ${platformName} is blocking automated downloads. Please use "Upload File" instead.`);
     }
 
-    // Generic error with actual message
+    // YouTube-specific errors
+    if (isYouTube) {
+      if (combinedOutput.includes('Private video')) {
+        throw new Error('This YouTube video is private. Please make it public or unlisted, or use "Upload File" instead.');
+      }
+      if (combinedOutput.includes('Sign in') || combinedOutput.includes('Login required')) {
+        throw new Error('This YouTube video requires sign-in. Please use "Upload File" instead.');
+      }
+      if (combinedOutput.includes('Video unavailable') || combinedOutput.includes('not available')) {
+        throw new Error('This YouTube video is unavailable. It may have been deleted, or is restricted in your region.');
+      }
+      if (combinedOutput.includes('age-restricted') || combinedOutput.includes('age restricted')) {
+        throw new Error('This YouTube video is age-restricted. Please use "Upload File" instead.');
+      }
+      if (combinedOutput.includes('members-only') || combinedOutput.includes('Members only')) {
+        throw new Error('This YouTube video is members-only content. Please use "Upload File" instead.');
+      }
+      if (combinedOutput.includes('copyright') || combinedOutput.includes('blocked')) {
+        throw new Error('This YouTube video is blocked due to copyright. Please use "Upload File" instead.');
+      }
+      if (combinedOutput.includes('live event') || combinedOutput.includes('Premieres')) {
+        throw new Error('This YouTube video is a live stream or premiere that has not ended. Please wait until it finishes or use "Upload File".');
+      }
+    }
+
+    // TikTok-specific errors
+    if (isTikTok) {
+      if (combinedOutput.includes('private') || combinedOutput.includes('Private')) {
+        throw new Error('This TikTok video is private. Please use "Upload File" instead.');
+      }
+    }
+
+    // Generic error with truncated message
     const errorMsg = error.stderr || error.message || 'Unknown error';
-    throw new Error(`Download failed: ${errorMsg.substring(0, 200)}`);
+    throw new Error(`Download failed: ${errorMsg.substring(0, 250)}`);
   }
 }
 
 /**
  * Download video from URL (TikTok, YouTube, Instagram)
+ * Uses yt-dlp as the only method - fails fast if blocked
  */
 export async function downloadVideo(url, outputPath) {
+  const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+  
+  console.log('Attempting to download from:', url);
+  console.log('Platform detected:', isYouTube ? 'YouTube' : 'Other');
+
+  // Try yt-dlp (only method - no fallback for speed)
   try {
-    console.log('Attempting to download from:', url);
+    return await downloadWithYtDlp(url, outputPath);
+  } catch (ytDlpError) {
+    console.log('yt-dlp failed:', ytDlpError.message);
 
-    // Try yt-dlp first (works for most platforms)
-    try {
-      return await downloadWithYtDlp(url, outputPath);
-    } catch (ytDlpError) {
-      console.log('yt-dlp failed, trying fallback methods:', ytDlpError.message);
-
-      // Check if it's a YouTube URL
-      if (ytdl.validateURL(url)) {
-        console.log('Falling back to ytdl-core for YouTube...');
-        try {
-          return await downloadYouTubeVideo(url, outputPath);
-        } catch (youtubeError) {
-          // YouTube bot detection - suggest file upload
-          if (youtubeError.message.includes('bot') || youtubeError.message.includes('Sign in')) {
-            throw new Error('YouTube has blocked automated downloads from this server. Please download the video to your device first, then use the "Upload File" option instead.');
-          }
-          throw youtubeError;
-        }
+    // For YouTube, provide clear upload guidance
+    if (isYouTube) {
+      // Check if error already contains upload guidance (from downloadWithYtDlp)
+      if (ytDlpError.message.includes('Upload File') || ytDlpError.message.includes('upload')) {
+        // Error already has upload guidance, re-throw as-is
+        throw ytDlpError;
       }
-
-      // If yt-dlp failed and it's not YouTube, throw error
-      throw new Error(`Video download failed. Please try downloading the video to your device and using the "Upload File" option instead.`);
+      
+      // Generic YouTube failure - prompt upload
+      throw new Error(
+        'Could not download this YouTube video. YouTube may be blocking automated downloads. ' +
+        'Please download the video to your device first, then use the "Upload File" option to process it.'
+      );
     }
-  } catch (error) {
-    console.error('Error downloading video:', error.message);
-    throw new Error(`Failed to download video: ${error.message}`);
+
+    // For non-YouTube platforms, suggest upload
+    const platform = url.includes('tiktok.com') ? 'TikTok' : 
+                     url.includes('instagram.com') ? 'Instagram' : 'this platform';
+    throw new Error(
+      `Could not download video from ${platform}. ` +
+      `Please download the video to your device first, then use the "Upload File" option.`
+    );
   }
-}
-
-/**
- * Download YouTube video
- */
-async function downloadYouTubeVideo(url, outputPath) {
-  return new Promise((resolve, reject) => {
-    console.log('Downloading YouTube video:', url);
-
-    try {
-      const stream = ytdl(url, {
-        quality: 'lowest',
-        filter: 'videoandaudio'
-      });
-
-      const writer = fs.createWriteStream(outputPath);
-      let downloadedBytes = 0;
-
-      stream.on('data', (chunk) => {
-        downloadedBytes += chunk.length;
-      });
-
-      stream.on('info', (info) => {
-        console.log('YouTube video info:', info.videoDetails.title);
-        console.log('Duration:', info.videoDetails.lengthSeconds, 'seconds');
-      });
-
-      stream.pipe(writer);
-
-      writer.on('finish', async () => {
-        console.log(`YouTube download complete: ${downloadedBytes} bytes`);
-
-        // Verify file
-        try {
-          const stats = await fsPromises.stat(outputPath);
-          if (stats.size === 0) {
-            reject(new Error('Downloaded YouTube file is empty'));
-            return;
-          }
-          console.log('YouTube file verified:', stats.size, 'bytes');
-          resolve(outputPath);
-        } catch (err) {
-          reject(new Error(`Failed to verify YouTube file: ${err.message}`));
-        }
-      });
-
-      writer.on('error', (err) => {
-        console.error('Writer error:', err);
-        reject(err);
-      });
-
-      stream.on('error', (err) => {
-        console.error('YouTube stream error:', err);
-        reject(new Error(`YouTube download failed: ${err.message}`));
-      });
-    } catch (error) {
-      console.error('YouTube download error:', error);
-      reject(error);
-    }
-  });
 }
 
 /**
