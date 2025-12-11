@@ -4,16 +4,14 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { guidesAPI, announcementsAPI } from '@/lib/api';
 import GuideCard from '@/components/GuideCard';
-import GuideListItem from '@/components/GuideListItem';
 import AddGuideModal from '@/components/AddGuideModal';
-import AddArticleModal from '@/components/AddArticleModal';
 import GuideSuccessModal from '@/components/GuideSuccessModal';
 import SearchBar from '@/components/SearchBar';
 import AuthModal from '@/components/AuthModal';
 import NotificationsModal from '@/components/NotificationsModal';
 import Navigation from '@/components/Navigation';
 import ProfileModal from '@/components/ProfileModal';
-import { Plus, LogOut, User, Moon, Sun, Bell, Grid3x3, List, FileText, CheckSquare, Trash2, X } from 'lucide-react';
+import { Plus, LogOut, User, Moon, Sun, Bell, CheckSquare, Trash2, X } from 'lucide-react';
 import { bulkMoveToTrash } from '@/lib/trashActions';
 import BulkActionToolbar from '@/components/BulkActionToolbar';
 
@@ -23,14 +21,12 @@ export default function Home() {
   const [guides, setGuides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showArticleModal, setShowArticleModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [hasUnseenNotifications, setHasUnseenNotifications] = useState(true);
-  const [viewMode, setViewMode] = useState('grid');
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedGuides, setSelectedGuides] = useState(new Set());
   const [filters, setFilters] = useState({
@@ -124,7 +120,6 @@ export default function Home() {
       loadGuides(user.id);
     }
     setShowAddModal(false);
-    setShowArticleModal(false);
     // Show success modal with celebration and smart review CTA
     setShowSuccessModal(true);
   };
@@ -366,20 +361,13 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2.5 rounded-lg hover:bg-primary-600 transition text-sm font-medium w-full"
+                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2.5 rounded-lg hover:bg-primary-600 transition text-sm font-medium"
               >
                 <Plus size={18} />
                 <span>Add Guide</span>
-              </button>
-              <button
-                onClick={() => setShowArticleModal(true)}
-                className="flex items-center justify-center gap-2 bg-blue-500 text-white px-4 py-2.5 rounded-lg hover:bg-blue-600 transition text-sm font-medium w-full"
-              >
-                <FileText size={18} />
-                <span>Add Article</span>
               </button>
             </div>
           </div>
@@ -393,22 +381,6 @@ export default function Home() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
-                title="Add a new guide or recipe"
-              >
-                <Plus size={20} />
-                <span>Add Guide</span>
-              </button>
-              <button
-                onClick={() => setShowArticleModal(true)}
-                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
-                title="Add guide from article or blog"
-              >
-                <FileText size={20} />
-                <span>Add Article</span>
-              </button>
               {guides.length > 0 && (
                 <button
                   onClick={toggleSelectionMode}
@@ -423,22 +395,14 @@ export default function Home() {
                   <span>{isSelectionMode ? 'Cancel' : 'Select'}</span>
                 </button>
               )}
-              <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
-                  title="Grid View"
-                >
-                  <Grid3x3 size={18} />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
-                  title="List View"
-                >
-                  <List size={18} />
-                </button>
-              </div>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
+                title="Add a new guide or recipe"
+              >
+                <Plus size={20} />
+                <span>Add Guide</span>
+              </button>
             </div>
           </div>
 
@@ -457,22 +421,6 @@ export default function Home() {
                 <span>{isSelectionMode ? 'Cancel' : 'Select'}</span>
               </button>
             )}
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1 ml-auto">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
-                title="Grid View"
-              >
-                <Grid3x3 size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
-                title="List View"
-              >
-                <List size={16} />
-              </button>
-            </div>
           </div>
 
           {/* Search and Filters */}
@@ -536,24 +484,10 @@ export default function Home() {
               Add Your First Guide
             </button>
           </div>
-        ) : viewMode === 'grid' ? (
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {guides.map((guide) => (
               <GuideCard
-                key={guide.id}
-                guide={guide}
-                userId={user.id}
-                onDeleted={handleGuideDeleted}
-                isSelectionMode={isSelectionMode}
-                isSelected={selectedGuides.has(guide.id)}
-                onToggleSelection={() => toggleGuideSelection(guide.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {guides.map((guide) => (
-              <GuideListItem
                 key={guide.id}
                 guide={guide}
                 userId={user.id}
@@ -572,16 +506,6 @@ export default function Home() {
         <AddGuideModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onGuideAdded={handleGuideAdded}
-          userId={user.id}
-        />
-      )}
-
-      {/* Add Article Modal */}
-      {showArticleModal && (
-        <AddArticleModal
-          isOpen={showArticleModal}
-          onClose={() => setShowArticleModal(false)}
           onGuideAdded={handleGuideAdded}
           userId={user.id}
         />
