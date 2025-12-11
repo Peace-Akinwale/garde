@@ -361,6 +361,13 @@ export default function Home() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+                  title="Add a new guide or recipe"
+                >
+                  <Plus size={18} />
+                </button>
                 {guides.length > 0 && (
                   <button
                     onClick={toggleSelectionMode}
@@ -381,13 +388,6 @@ export default function Home() {
                 >
                   {darkMode ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
-                  title="Add a new guide or recipe"
-                >
-                  <Plus size={18} />
-                </button>
               </div>
             </div>
           </div>
@@ -401,6 +401,13 @@ export default function Home() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+                title="Add a new guide or recipe"
+              >
+                <Plus size={20} />
+              </button>
               {guides.length > 0 && (
                 <button
                   onClick={toggleSelectionMode}
@@ -420,13 +427,6 @@ export default function Home() {
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
-                title="Add a new guide or recipe"
-              >
-                <Plus size={20} />
               </button>
             </div>
           </div>
