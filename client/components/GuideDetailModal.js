@@ -17,7 +17,10 @@ import {
   Share2,
   Video,
   Bell,
+  FileText,
+  Copy,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
 
 const typeIcons = {
   recipe: ChefHat,
@@ -60,6 +63,8 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [copySuccess, setCopySuccess] = useState(true);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const shareMenuRef = useRef(null);
 
   // Swipe-to-close state
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -184,35 +189,56 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
     }
   };
 
-  const handleShare = async () => {
+  // Close share menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(event.target)) {
+        setShowShareMenu(false);
+      }
+    };
+
+    if (showShareMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showShareMenu]);
+
+  const handleShareMenuToggle = () => {
+    setShowShareMenu(!showShareMenu);
+  };
+
+  const handleNativeShare = async () => {
     const shareText = `${guide.title}\n\n${guide.summary || ''}\n\nIngredients:\n${guide.ingredients?.map(i => `• ${i}`).join('\n') || ''}\n\nSteps:\n${guide.steps?.map((s, i) => `${i + 1}. ${s}`).join('\n') || ''}\n\nShared from Garde`;
 
-    // Try native share first (mobile)
     if (navigator.share) {
       try {
         await navigator.share({
           title: guide.title,
           text: shareText,
         });
-        return; // Success, no need for toast
+        setShowShareMenu(false);
       } catch (error) {
-        if (error.name === 'AbortError') {
-          return; // User cancelled, don't show error
+        if (error.name !== 'AbortError') {
+          console.error('Share failed:', error);
         }
-        // Share failed, fall through to clipboard
       }
+    } else {
+      // Fallback to copy if native share not available
+      handleCopyLink();
     }
+  };
 
-    // Fallback: Copy to clipboard (desktop)
+  const handleCopyLink = async () => {
+    const shareText = `${guide.title}\n\n${guide.summary || ''}\n\nIngredients:\n${guide.ingredients?.map(i => `• ${i}`).join('\n') || ''}\n\nSteps:\n${guide.steps?.map((s, i) => `${i + 1}. ${s}`).join('\n') || ''}\n\nShared from Garde`;
+
     try {
-      // Modern async clipboard API
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(shareText);
         setCopySuccess(true);
         setShowCopyToast(true);
+        setShowShareMenu(false);
         setTimeout(() => setShowCopyToast(false), 3000);
       } else {
-        // Legacy fallback for older browsers
         const textarea = document.createElement('textarea');
         textarea.value = shareText;
         textarea.style.position = 'fixed';
@@ -225,6 +251,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
         if (success) {
           setCopySuccess(true);
           setShowCopyToast(true);
+          setShowShareMenu(false);
           setTimeout(() => setShowCopyToast(false), 3000);
         } else {
           throw new Error('Copy failed');
@@ -232,6 +259,124 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
       }
     } catch (error) {
       console.error('Error copying:', error);
+      setCopySuccess(false);
+      setShowCopyToast(true);
+      setTimeout(() => setShowCopyToast(false), 4000);
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      let yPos = margin;
+      const lineHeight = 7;
+      const maxWidth = pageWidth - (margin * 2);
+
+      // Helper function to add text with word wrap
+      const addWrappedText = (text, fontSize = 12, isBold = false, color = [0, 0, 0]) => {
+        doc.setFontSize(fontSize);
+        doc.setTextColor(color[0], color[1], color[2]);
+        if (isBold) {
+          doc.setFont(undefined, 'bold');
+        } else {
+          doc.setFont(undefined, 'normal');
+        }
+        
+        const lines = doc.splitTextToSize(text, maxWidth);
+        lines.forEach((line) => {
+          if (yPos > pageHeight - margin - lineHeight) {
+            doc.addPage();
+            yPos = margin;
+          }
+          doc.text(line, margin, yPos);
+          yPos += lineHeight;
+        });
+        yPos += 2; // Add spacing after text block
+      };
+
+      // Title
+      addWrappedText(guide.title, 20, true, [0, 0, 0]);
+      yPos += 3;
+
+      // Metadata
+      const metadata = [];
+      if (guide.type) metadata.push(`Type: ${guide.type}`);
+      if (guide.category) metadata.push(`Category: ${guide.category}`);
+      if (guide.difficulty) metadata.push(`Difficulty: ${guide.difficulty}`);
+      if (guide.duration) metadata.push(`Duration: ${guide.duration}`);
+      if (guide.servings) metadata.push(`Servings: ${guide.servings}`);
+      
+      if (metadata.length > 0) {
+        addWrappedText(metadata.join(' • '), 10, false, [100, 100, 100]);
+        yPos += 5;
+      }
+
+      // Summary
+      if (guide.summary) {
+        addWrappedText('Summary', 14, true);
+        addWrappedText(guide.summary, 11, false);
+        yPos += 3;
+      }
+
+      // Ingredients/Materials
+      const ingredientsLabel = getContentLabels(guide.type).ingredients;
+      if (guide.ingredients && guide.ingredients.length > 0) {
+        addWrappedText(ingredientsLabel, 14, true);
+        guide.ingredients.forEach((ingredient) => {
+          addWrappedText(`• ${ingredient}`, 11, false);
+        });
+        yPos += 3;
+      }
+
+      // Steps
+      const stepsLabel = getContentLabels(guide.type).steps;
+      if (guide.steps && guide.steps.length > 0) {
+        addWrappedText(stepsLabel, 14, true);
+        guide.steps.forEach((step, index) => {
+          addWrappedText(`${index + 1}. ${step}`, 11, false);
+        });
+        yPos += 3;
+      }
+
+      // Tips
+      if (guide.tips && guide.tips.length > 0) {
+        addWrappedText('Tips', 14, true);
+        guide.tips.forEach((tip) => {
+          addWrappedText(`• ${tip}`, 11, false);
+        });
+        yPos += 3;
+      }
+
+      // Footer
+      const footerY = pageHeight - 15;
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.setFont(undefined, 'normal');
+      
+      let footerText = 'Created with Garde';
+      if (guide.source_url) {
+        footerText += ` | Source: ${guide.source_url}`;
+      }
+      if (guide.created_at) {
+        const date = new Date(guide.created_at).toLocaleDateString();
+        footerText += ` | ${date}`;
+      }
+      
+      doc.text(footerText, margin, footerY);
+
+      // Save PDF
+      const fileName = `${guide.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      doc.save(fileName);
+      
+      setShowShareMenu(false);
+      setCopySuccess(true);
+      setShowCopyToast(true);
+      setTimeout(() => setShowCopyToast(false), 3000);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
       setCopySuccess(false);
       setShowCopyToast(true);
       setTimeout(() => setShowCopyToast(false), 4000);
@@ -336,14 +481,44 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
                   <span className="hidden sm:inline">Remind Me</span>
                 </button>
                 */}
-                <button
-                  onClick={handleShare}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                  title="Share this recipe"
-                >
-                  <Share2 size={20} />
-                  <span className="hidden sm:inline">Share</span>
-                </button>
+                <div className="relative" ref={shareMenuRef}>
+                  <button
+                    onClick={handleShareMenuToggle}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                    title="Share this guide"
+                  >
+                    <Share2 size={20} />
+                    <span className="hidden sm:inline">Share</span>
+                  </button>
+                  
+                  {showShareMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 z-50 overflow-hidden">
+                      {navigator.share && (
+                        <button
+                          onClick={handleNativeShare}
+                          className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-slate-600 transition text-gray-900 dark:text-white"
+                        >
+                          <Share2 size={18} />
+                          <span>Share via...</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={handleCopyLink}
+                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-slate-600 transition text-gray-900 dark:text-white border-t border-gray-200 dark:border-slate-600"
+                      >
+                        <Copy size={18} />
+                        <span>Copy to clipboard</span>
+                      </button>
+                      <button
+                        onClick={handleExportPDF}
+                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-slate-600 transition text-gray-900 dark:text-white border-t border-gray-200 dark:border-slate-600"
+                      >
+                        <FileText size={18} />
+                        <span>Export as PDF</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
             {editing ? (
