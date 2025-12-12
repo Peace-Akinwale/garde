@@ -366,7 +366,7 @@ export default function Home() {
                   className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
                   title="Add a new guide or recipe"
                 >
-                  <Plus size={18} />
+                  <Plus size={24} />
                 </button>
                 {guides.length > 0 && (
                   <button
@@ -406,7 +406,7 @@ export default function Home() {
                 className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
                 title="Add a new guide or recipe"
               >
-                <Plus size={20} />
+                <Plus size={26} />
               </button>
               {guides.length > 0 && (
                 <button
