@@ -67,21 +67,21 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
         await updateJobStatus(jobId, {status: 'completed', completed_at: new Date().toISOString(), progress: 100, current_step: 'Complete!', transcription: {text: transcriptData.text, language: transcriptData.language, source: 'youtube_transcript'}, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'youtube_transcript'}});
         return {success: true, transcription: transcriptData, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'youtube_transcript'}};
       } else {
-        // No transcript available - fail immediately for YouTube videos
-        throw new Error(
-          'This YouTube video does not have captions/subtitles. ' +
-          'Please try a different video with captions, or download this video to your device and use the "Upload File" option instead.'
-        );
+        // No transcript available - fall back to download + Whisper
+        console.log('📹 No transcript found - falling back to video download...');
+        await updateJobStatus(jobId, {progress: 15, current_step: 'No captions found, downloading video...'});
       }
     }
 
-    // Mark as processing
-    await updateJobStatus(jobId, {
-      status: 'processing',
-      started_at: new Date().toISOString(),
-      progress: 10,
-      current_step: 'Downloading video...'
-    });
+    // Mark as processing (only for non-YouTube or if YouTube transcript was not attempted)
+    if (!isYouTube) {
+      await updateJobStatus(jobId, {
+        status: 'processing',
+        started_at: new Date().toISOString(),
+        progress: 10,
+        current_step: 'Downloading video...'
+      });
+    }
 
     // Update progress during processing
     const originalProcessVideo = processVideo;
