@@ -1,10 +1,14 @@
 'use client';
 
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 export default function SearchBar({ filters, onFiltersChange }) {
   const handleSearchChange = (e) => {
     onFiltersChange({ ...filters, search: e.target.value });
+  };
+
+  const handleClearSearch = () => {
+    onFiltersChange({ ...filters, search: '' });
   };
 
   const handleTypeChange = (e) => {
@@ -23,15 +27,24 @@ export default function SearchBar({ filters, onFiltersChange }) {
           value={filters.search}
           onChange={handleSearchChange}
           placeholder="Search guides..."
-          className="w-full pl-10 pr-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+          className="w-full pl-10 pr-10 py-2 text-gray-900 dark:text-white bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
+        {filters.search && (
+          <button
+            onClick={handleClearSearch}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title="Clear search"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {/* Type Filter */}
       <select
         value={filters.type}
         onChange={handleTypeChange}
-        className="px-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        className="px-4 py-2 text-gray-900 dark:text-white bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
       >
         <option value="all">All Types</option>
         <option value="recipe">Recipes</option>
