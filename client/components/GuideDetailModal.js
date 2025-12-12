@@ -555,6 +555,119 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
               )}
             </div>
 
+            {/* Original Video */}
+            {guide.source_url && (() => {
+              const url = guide.source_url;
+              const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+              const isTikTok = url.includes('tiktok.com');
+              const isInstagram = url.includes('instagram.com');
+              const isFacebook = url.includes('facebook.com') || url.includes('fb.watch');
+              const isTwitter = url.includes('twitter.com') || url.includes('x.com');
+
+              // Extract YouTube video ID
+              const getYouTubeId = (url) => {
+                const patterns = [
+                  /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/,
+                  /youtube\.com\/embed\/([^&\s]+)/,
+                  /youtube\.com\/shorts\/([^&\s]+)/
+                ];
+                for (const pattern of patterns) {
+                  const match = url.match(pattern);
+                  if (match) return match[1];
+                }
+                return null;
+              };
+
+              const youtubeId = isYouTube ? getYouTubeId(url) : null;
+              const canEmbed = isYouTube && youtubeId;
+
+              return (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Original Video</h3>
+
+                  {/* YouTube Embed */}
+                  {canEmbed && (
+                    <div className="rounded-lg overflow-hidden bg-black">
+                      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                        <iframe
+                          className="absolute inset-0 w-full h-full"
+                          src={`https://www.youtube.com/embed/${youtubeId}`}
+                          title="YouTube video player"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TikTok Link */}
+                  {isTikTok && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white p-6 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Video size={24} className="flex-shrink-0" />
+                        <span className="text-xl font-semibold">Watch on TikTok</span>
+                      </div>
+                      <p className="text-sm text-white/90">Click to open original video</p>
+                    </a>
+                  )}
+
+                  {/* Instagram Link */}
+                  {isInstagram && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white p-6 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Video size={24} className="flex-shrink-0" />
+                        <span className="text-xl font-semibold">Watch on Instagram</span>
+                      </div>
+                      <p className="text-sm text-white/90">Click to open original video</p>
+                    </a>
+                  )}
+
+                  {/* Facebook Link */}
+                  {isFacebook && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white p-6 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Video size={24} className="flex-shrink-0" />
+                        <span className="text-xl font-semibold">Watch on Facebook</span>
+                      </div>
+                      <p className="text-sm text-white/90">Click to open original video</p>
+                    </a>
+                  )}
+
+                  {/* Twitter/X Link */}
+                  {isTwitter && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white p-6 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Video size={24} className="flex-shrink-0" />
+                        <span className="text-xl font-semibold">Watch on X</span>
+                      </div>
+                      <p className="text-sm text-white/90">Click to open original video</p>
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Summary */}
             {guide.summary && (
               <div id="summary-0">
@@ -639,7 +752,7 @@ export default function GuideDetailModal({ guide, userId, isOpen, onClose, onUpd
             {/* Source URL */}
             {guide.source_url && (
               <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   Source: <a href={guide.source_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline break-all">{guide.source_url}</a>
                 </p>
               </div>

@@ -1,4 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
+import ytdl from '@distube/ytdl-core';
 import axios from 'axios';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
@@ -8,13 +9,17 @@ import { openai, anthropic } from '../index.js';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { YoutubeTranscript } from '@danielxceron/youtube-transcript';
 
 const execPromise = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configure FFmpeg and yt-dlp paths for production (Render)
-let ytDlpPath = 'yt-dlp'; // default to system yt-dlp
+// On Windows dev, use 'python -m yt_dlp' since yt-dlp might not be on PATH
+let ytDlpPath = process.platform === 'win32' && process.env.NODE_ENV !== 'production' 
+  ? 'python -m yt_dlp' 
+  : 'yt-dlp'; // default to system yt-dlp
 let ytDlpCookiesPath = null; // optional cookies file for YouTube auth
 
 if (process.env.NODE_ENV === 'production') {
@@ -123,6 +128,112 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
 }
 
 /**
+ * Fetch native YouTube transcript with auto-translation support
+ *
+ * Tries to fetch English transcript first (including auto-translated).
+ * Falls back to Spanish, French, then original language.
+ *
+ * @param {string} videoUrl - YouTube URL or video ID
+ * @returns {Object|null} - { text, language, segments, isTranslated } or null
+ */
+export async function fetchYoutubeTranscript(videoUrl) {
+  try {
+    console.log('📝 Fetching YouTube transcript with auto-translation...');
+
+    let transcript = null;
+    let detectedLanguage = 'en';
+    let isTranslated = false;
+
+    // Try languages in priority order: English, Spanish, French, Original
+    const languages = [
+      { code: 'en', name: 'English' },
+      { code: 'es', name: 'Spanish' },
+      { code: 'fr', name: 'French' },
+      { code: null, name: 'Original' }
+    ];
+
+    for (const lang of languages) {
+      try {
+        if (lang.code) {
+          console.log(`   Trying ${lang.name}...`);
+          transcript = await YoutubeTranscript.fetchTranscript(videoUrl, { lang: lang.code });
+          detectedLanguage = lang.code;
+          isTranslated = lang.code !== 'en';
+        } else {
+          console.log('   Trying original...');
+          transcript = await YoutubeTranscript.fetchTranscript(videoUrl);
+          detectedLanguage = 'unknown';
+        }
+
+        if (transcript && transcript.length > 0) {
+          console.log(`   Found ${lang.name} transcript!`);
+          break;
+        }
+      } catch (err) {
+        console.log(`   ${lang.name} unavailable`);
+        continue;
+      }
+    }
+
+    if (!transcript || transcript.length === 0) {
+      console.log('No transcript in any language');
+      return null;
+    }
+
+    const fullText = transcript.map(s => s.text).join(' ').trim();
+
+    if (fullText.length < 100) {
+      console.log('Transcript too short');
+      return null;
+    }
+
+    console.log(`Fetched: ${transcript.length} segments, ${fullText.length} chars, ${detectedLanguage}${isTranslated ? ' (translated)' : ''}`);
+
+    return {
+      text: fullText,
+      language: detectedLanguage,
+      segments: transcript,
+      method: 'youtube_transcript',
+      isTranslated: isTranslated,
+    };
+  } catch (error) {
+    console.log('Transcript fetch failed:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Check if Vision API response indicates a poor/failed analysis
+ * Returns true if the response contains error indicators
+ */
+function isPoorVisionResponse(analysisText) {
+  if (!analysisText || analysisText.trim().length < 20) {
+    return true; // Too short to be useful
+  }
+
+  const errorPhrases = [
+    'unable to extract',
+    'cannot extract',
+    'no visible content',
+    'cannot see',
+    'unable to see',
+    'image appears to be',
+    'appears to be blank',
+    'too blurry',
+    'too dark',
+    'no clear',
+    'cannot identify',
+    'unable to identify',
+    'no text visible',
+    'no information',
+    'cannot determine'
+  ];
+
+  const lowerText = analysisText.toLowerCase();
+  return errorPhrases.some(phrase => lowerText.includes(phrase));
+}
+
+/**
  * Get Vision API prompt based on content type (domain-agnostic for all tutorials)
  */
 function getVisionPrompt(frameIndex, totalFrames, isPhotoCarousel = false) {
@@ -179,7 +290,7 @@ Be EXHAUSTIVE with text extraction - even tiny text or partially visible text is
 async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
   try {
     const frameCount = imagePaths.length;
-    const BATCH_SIZE = 4; // Process 4 frames at a time (optimized for 2GB RAM Standard tier)
+    const BATCH_SIZE = 6; // Process 6 frames at a time (optimized for speed)
     console.log(`🚀 Analyzing ${frameCount} images with Vision API (batches of ${BATCH_SIZE})...`);
     const startTime = Date.now();
 
@@ -211,28 +322,70 @@ async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
             const detailLevel = globalIndex < 3 ? 'high' : 'low';
             const prompt = getVisionPrompt(globalIndex, frameCount, isPhotoCarousel);
 
-            // Call Vision API
-            const response = await openai.chat.completions.create({
-              model: 'gpt-4o',
-              messages: [
-                {
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: prompt },
-                    {
-                      type: 'image_url',
-                      image_url: {
-                        url: `data:${mimeType};base64,${base64Image}`,
-                        detail: detailLevel
-                      }
-                    }
-                  ]
-                }
-              ],
-              max_tokens: 500
-            });
+            // Retry up to 2 times if Vision API returns poor response
+            let analysis = null;
+            let lastError = null;
+            const MAX_RETRIES = 2;
 
-            const analysis = response.choices[0].message.content;
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+              try {
+                // Call Vision API (using gpt-4o-mini for speed - 3x faster, excellent text recognition)
+                const response = await openai.chat.completions.create({
+                  model: 'gpt-4o-mini',
+                  messages: [
+                    {
+                      role: 'user',
+                      content: [
+                        { type: 'text', text: prompt },
+                        {
+                          type: 'image_url',
+                          image_url: {
+                            url: `data:${mimeType};base64,${base64Image}`,
+                            detail: detailLevel
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  max_tokens: 500
+                });
+
+                const responseText = response.choices[0].message.content;
+
+                // Check if response is poor/error
+                if (isPoorVisionResponse(responseText)) {
+                  console.warn(`⚠️ Frame ${globalIndex + 1} attempt ${attempt}: Poor Vision API response detected`);
+                  lastError = `Poor response: ${responseText.substring(0, 100)}`;
+
+                  if (attempt < MAX_RETRIES) {
+                    // Wait a bit before retry (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, attempt * 500));
+                    continue; // Retry
+                  }
+                } else {
+                  // Good response!
+                  analysis = responseText;
+                  if (attempt > 1) {
+                    console.log(`✅ Frame ${globalIndex + 1}: Success on attempt ${attempt}`);
+                  }
+                  break;
+                }
+              } catch (apiError) {
+                console.error(`❌ Frame ${globalIndex + 1} attempt ${attempt} API error:`, apiError.message);
+                lastError = apiError.message;
+
+                if (attempt < MAX_RETRIES) {
+                  await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+                  continue; // Retry
+                }
+              }
+            }
+
+            // If all retries failed, use error message
+            if (!analysis) {
+              analysis = `[Frame ${globalIndex + 1} failed after ${MAX_RETRIES} attempts: ${lastError}]`;
+              console.error(`❌ Frame ${globalIndex + 1}: All retry attempts failed`);
+            }
 
             // Delete frame immediately after analysis to free memory
             try {
@@ -262,6 +415,24 @@ async function analyzeImagesWithVision(imagePaths, isPhotoCarousel = false) {
 
     // Sort by index to maintain frame order
     allAnalyses.sort((a, b) => a.index - b.index);
+
+    // Check if too many frames failed
+    const failedFrames = allAnalyses.filter(a =>
+      a.analysis.includes('[Frame') && a.analysis.includes('failed')
+    ).length;
+    const failureRate = failedFrames / frameCount;
+
+    if (failureRate > 0.7) {
+      // More than 70% of frames failed
+      console.error(`❌ Too many frames failed: ${failedFrames}/${frameCount} (${(failureRate * 100).toFixed(0)}%)`);
+      throw new Error(
+        `Vision API failed to analyze most frames (${failedFrames}/${frameCount}). ` +
+        `This video may not have enough visual content to extract. ` +
+        `Please try a video with clearer visuals, on-screen text, or narration.`
+      );
+    } else if (failedFrames > 0) {
+      console.warn(`⚠️ Some frames failed: ${failedFrames}/${frameCount}, but continuing with partial results`);
+    }
 
     // Combine all analyses
     const combinedText = allAnalyses.map(a => a.analysis).join('\n\n---\n\n');
@@ -323,30 +494,37 @@ function buildYtDlpOptions(url) {
 
   if (isYouTube) {
     platformName = 'YouTube';
-    // YouTube format: prefer mp4 video + m4a audio, fallback to best combined
-    // This ensures we get a format FFmpeg can process
-    // No rate limiting or quality restrictions - let it download at full speed
-    formatString = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best';
-    timeout = 120000; // 2 minutes for YouTube (same as other platforms)
-    
-    console.log('Applying YouTube-specific options (2min timeout, no rate limit)');
+    // YouTube format: prefer mp4 video + m4a audio, up to 1080p to keep file size reasonable
+    formatString = 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/bestvideo+bestaudio/best';
+    timeout = 900000; // 15 minutes for YouTube (handles long videos with rate limiting)
+
+    // IMPORTANT: Rate limit YouTube downloads to bypass bot detection
+    // Limiting to 1M/s balances speed with appearing human-like
+    // At 1MB/s: 300MB video = ~5 minutes, 600MB video = ~10 minutes
+    baseFlags.push('--limit-rate', '1M');
+
+    // Add more human-like behavior flags for YouTube
+    baseFlags.push('--sleep-interval', '1');  // Sleep 1 second between requests
+    baseFlags.push('--max-sleep-interval', '3');  // Max 3 seconds sleep
+
+    console.log('Applying YouTube-specific options (15min timeout, 1MB/s rate limit, human-like delays)');
     
   } else if (isTikTok) {
     platformName = 'TikTok';
     formatString = 'best[ext=mp4]/best';
-    timeout = 120000; // 2 minutes for TikTok
-    console.log('Applying TikTok-specific options (2min timeout)');
+    timeout = 600000; // 10 minutes for TikTok (handles longer videos up to 10 min)
+    console.log('Applying TikTok-specific options (10min timeout)');
     
   } else if (isInstagram) {
     platformName = 'Instagram';
     formatString = 'best[ext=mp4]/best';
-    timeout = 120000; // 2 minutes for Instagram
-    console.log('Applying Instagram-specific options (2min timeout)');
+    timeout = 600000; // 10 minutes for Instagram (handles longer videos)
+    console.log('Applying Instagram-specific options (10min timeout)');
     
   } else {
     platformName = 'video source';
     formatString = 'best[ext=mp4]/best';
-    timeout = 90000; // 90 seconds for other platforms
+    timeout = 600000; // 10 minutes for other platforms (Facebook, Twitter, etc.)
   }
 
   baseFlags.push('-f', `"${formatString}"`);
@@ -465,6 +643,93 @@ async function downloadWithYtDlp(url, outputPath) {
   }
 }
 
+
+/**
+ * Download YouTube video using ytdl-core (fallback method)
+ * This is slower but can work when yt-dlp is blocked by YouTube's bot detection
+ */
+async function downloadYouTubeVideo(url, outputPath) {
+  return new Promise((resolve, reject) => {
+    console.log('Using ytdl-core fallback for YouTube:', url);
+
+    try {
+      // Use lowest quality to download faster and appear more human-like
+      const stream = ytdl(url, {
+        quality: 'lowest',
+        filter: 'videoandaudio',
+        // Additional options to bypass bot detection
+        requestOptions: {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          }
+        }
+      });
+
+      const writer = fs.createWriteStream(outputPath);
+      let downloadedBytes = 0;
+      let lastLogTime = Date.now();
+
+      stream.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+
+        // Log progress every 5 seconds
+        const now = Date.now();
+        if (now - lastLogTime > 5000) {
+          console.log(`YouTube download progress: ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB`);
+          lastLogTime = now;
+        }
+      });
+
+      stream.on('info', (info) => {
+        console.log('YouTube video info:', info.videoDetails.title);
+        console.log('Duration:', info.videoDetails.lengthSeconds, 'seconds');
+      });
+
+      stream.pipe(writer);
+
+      writer.on('finish', async () => {
+        console.log(`OK: ytdl-core download complete: ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB`);
+
+        // Verify file
+        try {
+          const stats = await fsPromises.stat(outputPath);
+          if (stats.size === 0) {
+            reject(new Error('Downloaded YouTube file is empty'));
+            return;
+          }
+          console.log('YouTube file verified:', (stats.size / 1024 / 1024).toFixed(2), 'MB');
+          resolve(outputPath);
+        } catch (err) {
+          reject(new Error(`Failed to verify YouTube file: ${err.message}`));
+        }
+      });
+
+      writer.on('error', (err) => {
+        console.error('Writer error:', err);
+        reject(err);
+      });
+
+      stream.on('error', (err) => {
+        console.error('YouTube stream error:', err);
+        reject(new Error(`YouTube download failed: ${err.message}`));
+      });
+
+      // Set timeout (15 minutes for YouTube fallback - handles long videos)
+      setTimeout(() => {
+        stream.destroy();
+        writer.destroy();
+        reject(new Error('YouTube download timeout - video took too long to download'));
+      }, 900000);
+
+    } catch (error) {
+      console.error('YouTube download error:', error);
+      reject(error);
+    }
+  });
+}
+
 /**
  * Download video from URL (TikTok, YouTube, Instagram)
  * Uses yt-dlp as the only method - fails fast if blocked
@@ -475,25 +740,50 @@ export async function downloadVideo(url, outputPath) {
   console.log('Attempting to download from:', url);
   console.log('Platform detected:', isYouTube ? 'YouTube' : 'Other');
 
-  // Try yt-dlp (only method - no fallback for speed)
+  // Try yt-dlp first (works for all platforms)
   try {
     return await downloadWithYtDlp(url, outputPath);
   } catch (ytDlpError) {
     console.log('yt-dlp failed:', ytDlpError.message);
 
-    // For YouTube, provide clear upload guidance
+    // For YouTube ONLY, decide whether to try ytdl-core fallback or fail fast
     if (isYouTube) {
-      // Check if error already contains upload guidance (from downloadWithYtDlp)
-      if (ytDlpError.message.includes('Upload File') || ytDlpError.message.includes('upload')) {
-        // Error already has upload guidance, re-throw as-is
+      // Check if error is something fallback can't fix (fail fast - no waiting)
+      const errorMsg = ytDlpError.message.toLowerCase();
+      const unfixableErrors = [
+        'private', 'unavailable', 'deleted', 'members-only',
+        'age-restricted', 'copyright', 'blocked', 'live event', 'premiere'
+      ];
+      
+      const isUnfixable = unfixableErrors.some(err => errorMsg.includes(err));
+      
+      if (isUnfixable) {
+        // Video itself is inaccessible - fallback won't help, fail immediately
+        console.log('YouTube video is inaccessible (not a bot detection issue) - failing fast');
         throw ytDlpError;
       }
-      
-      // Generic YouTube failure - prompt upload
-      throw new Error(
-        'Could not download this YouTube video. YouTube may be blocking automated downloads. ' +
-        'Please download the video to your device first, then use the "Upload File" option to process it.'
-      );
+
+      // Bot detection or network issue - try fallback (might work)
+      console.log('Attempting YouTube fallback with ytdl-core...');
+      try {
+        return await downloadYouTubeVideo(url, outputPath);
+      } catch (ytdlCoreError) {
+        console.error('ytdl-core fallback also failed:', ytdlCoreError.message);
+
+        // Both methods failed - provide helpful error
+        if (ytdlCoreError.message.includes('bot') || ytdlCoreError.message.includes('Sign in')) {
+          throw new Error(
+            'YouTube has blocked automated downloads from this server (tried 2 methods). ' +
+            'Please download the video to your device first, then use the "Upload File" option to process it.'
+          );
+        }
+
+        // Generic YouTube error
+        throw new Error(
+          'Could not download this YouTube video after trying multiple methods. ' +
+          'Please download the video to your device first, then use the "Upload File" option to process it.'
+        );
+      }
     }
 
     // For non-YouTube platforms, suggest upload
@@ -857,9 +1147,9 @@ export async function processVideo(videoSource, isFile = false, userId) {
       // Step 2: Extract audio
       await extractAudio(videoPath, audioPath);
 
-      // Step 3: Transcribe audio with Whisper
+      // Step 3: Transcribe audio with Whisper (sequential to save RAM on 2GB servers)
+      console.log('Transcribing audio with Whisper...');
       transcription = await transcribeAudio(audioPath);
-
       // Step 4: SMART DETECTION - Check if we need Vision API
       const isLikelyMusicOrChant = (text) => {
         if (!text || text.length < 50) return true;
@@ -917,10 +1207,13 @@ export async function processVideo(videoSource, isFile = false, userId) {
         console.log('📖 Non-instructional narration detected → Using 12 frames');
       }
 
-      // Extract frames and analyze if needed
+      // Extract and analyze frames if needed
       if (useVisionAPI) {
+        // Extract frames now that we know we need them (sequential to save RAM)
         console.log(`Extracting ${frameCount} frames for visual analysis...`);
         const framePaths = await extractVideoFrames(videoPath, tempDir, frameCount);
+
+        console.log(`Analyzing ${frameCount} frames with Vision API...`);
         const visionAnalysis = await analyzeImagesWithVision(framePaths, false);
 
         if (contentType === 'video_with_narration') {
@@ -939,12 +1232,40 @@ export async function processVideo(videoSource, isFile = false, userId) {
         // Pure audio transcription (rare - only if perfect narration with no visual text)
         contentType = 'video';
         transcription.source = 'audio';
-        console.log('✅ Using audio transcription only');
+        console.log('✅ Using audio transcription only (frames discarded)');
       }
     }
 
     // Step 4: Extract structured guide with Claude (pass language for context)
     const extractedGuide = await extractGuideFromText(transcription.text, transcription.language);
+
+    // Check if AI detected non-instructional content (applies to all sources including Whisper)
+    const summary = extractedGuide.summary?.toLowerCase() || '';
+    const title = extractedGuide.title?.toLowerCase() || '';
+    const isNonInstructional =
+      summary.includes('no instructional content') ||
+      summary.includes('no recipe') ||
+      summary.includes('no how-to guide') ||
+      summary.includes('appears to be lyrics') ||
+      summary.includes('appears to be poetry') ||
+      summary.includes('lyric') ||
+      summary.includes('poetic content') ||
+      summary.includes('song') ||
+      summary.includes('only audio narration') ||
+      summary.includes('contains only error messages') ||
+      summary.includes('failed attempts to extract') ||
+      summary.includes('no actual instructional content') ||
+      title.includes('unable to extract content') ||
+      (summary.includes('unclear content') && (summary.includes('song') || summary.includes('poetic')));
+
+    if (isNonInstructional) {
+      // Content is not instructional - fail with helpful message
+      throw new Error(
+        'This video does not contain instructional content (recipe, how-to, or tutorial). ' +
+        'It appears to be music, poetry, or casual conversation. ' +
+        'Please try a video with clear cooking steps, DIY instructions, or tutorial content.'
+      );
+    }
 
     // Step 5: Cleanup temp files
     await fsPromises.rm(tempDir, { recursive: true, force: true });

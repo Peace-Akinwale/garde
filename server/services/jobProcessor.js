@@ -1,5 +1,5 @@
 import { supabase } from '../index.js';
-import { processVideo } from './videoProcessor.js';
+import { processVideo, extractGuideFromText, fetchYoutubeTranscript } from './videoProcessor.js';
 import fsPromises from 'fs/promises';
 import fs from 'fs';
 
@@ -34,6 +34,47 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
   console.log(`Starting background processing for job ${jobId}`);
 
   try {
+    // YouTube transcript check
+    const isYouTube = !isFile && (videoSource.includes('youtube.com') || videoSource.includes('youtu.be'));
+    if (isYouTube) {
+      await updateJobStatus(jobId, {status: 'processing', started_at: new Date().toISOString(), progress: 10, current_step: 'Checking for captions...'});
+      const transcriptData = await fetchYoutubeTranscript(videoSource);
+      if (transcriptData) {
+        await updateJobStatus(jobId, {progress: 40, current_step: 'Found captions!'});
+        const guide = await extractGuideFromText(transcriptData.text, transcriptData.language);
+        await updateJobStatus(jobId, {progress: 80, current_step: 'Analyzing content...'});
+
+        // Check if AI detected non-instructional content
+        const summary = guide.summary?.toLowerCase() || '';
+        const isNonInstructional =
+          summary.includes('no instructional content') ||
+          summary.includes('no recipe') ||
+          summary.includes('no how-to guide') ||
+          summary.includes('appears to be lyrics') ||
+          summary.includes('appears to be poetry') ||
+          summary.includes('only audio narration') ||
+          summary.includes('no visual content successfully extracted');
+
+        if (isNonInstructional) {
+          // Content is not instructional - fail the job with helpful message
+          throw new Error(
+            'This YouTube video does not contain instructional content (recipe, how-to, or tutorial). ' +
+            'It appears to be music, poetry, or casual conversation. ' +
+            'Please try a video with clear cooking steps, DIY instructions, or tutorial content.'
+          );
+        }
+
+        await updateJobStatus(jobId, {status: 'completed', completed_at: new Date().toISOString(), progress: 100, current_step: 'Complete!', transcription: {text: transcriptData.text, language: transcriptData.language, source: 'youtube_transcript'}, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'youtube_transcript'}});
+        return {success: true, transcription: transcriptData, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'youtube_transcript'}};
+      } else {
+        // No transcript available - fail immediately for YouTube videos
+        throw new Error(
+          'This YouTube video does not have captions/subtitles. ' +
+          'Please try a different video with captions, or download this video to your device and use the "Upload File" option instead.'
+        );
+      }
+    }
+
     // Mark as processing
     await updateJobStatus(jobId, {
       status: 'processing',
@@ -89,13 +130,30 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
   } catch (error) {
     console.error(`Job ${jobId} failed:`, error);
 
+    // Make error messages user-friendly
+    let userFriendlyMessage = error.message;
+
+    // Vision API errors - replace technical message with user-friendly one
+    if (error.message.includes('Vision analysis failed') ||
+        error.message.includes('Vision API failed') ||
+        error.message.includes('failed to analyze most frames')) {
+      userFriendlyMessage = 'Unable to process this video. Please download the video to your device and use the "Upload File" option instead.';
+    }
+
+    // Bot detection errors
+    else if (error.message.includes('bot') ||
+             error.message.includes('Sign in') ||
+             error.message.includes('blocked automated downloads')) {
+      userFriendlyMessage = 'Unable to download this video due to platform restrictions. Please download the video to your device and use the "Upload File" option instead.';
+    }
+
     // Mark as failed
     await updateJobStatus(jobId, {
       status: 'failed',
       completed_at: new Date().toISOString(),
       progress: 0,
       current_step: 'Failed',
-      error_message: error.message
+      error_message: userFriendlyMessage
     });
 
     // CLEANUP: Delete original uploaded file even on failure
