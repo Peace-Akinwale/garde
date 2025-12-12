@@ -128,6 +128,29 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
 }
 
 /**
+ * Extract clean YouTube video ID from any YouTube URL format
+ * Handles: youtube.com/watch, youtu.be, youtube.com/shorts, with tracking params
+ */
+function extractYouTubeVideoId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=)([^&\s]+)/,           // youtube.com/watch?v=ID
+    /(?:youtu\.be\/)([^?&\s]+)/,                      // youtu.be/ID
+    /(?:youtube\.com\/shorts\/)([^?&\s]+)/,           // youtube.com/shorts/ID
+    /(?:youtube\.com\/embed\/)([^?&\s]+)/,            // youtube.com/embed/ID
+    /^([a-zA-Z0-9_-]{11})$/                           // Just the ID itself
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+/**
  * Fetch native YouTube transcript with auto-translation support
  *
  * Tries to fetch English transcript first (including auto-translated).
@@ -139,6 +162,15 @@ async function extractVideoFrames(videoPath, outputDir, numFrames = 6) {
 export async function fetchYoutubeTranscript(videoUrl) {
   try {
     console.log('📝 Fetching YouTube transcript with auto-translation...');
+
+    // Extract clean video ID (handles Shorts, tracking params, etc.)
+    const videoId = extractYouTubeVideoId(videoUrl);
+    if (!videoId) {
+      console.log('❌ Could not extract video ID from URL:', videoUrl);
+      return null;
+    }
+
+    console.log(`   Video ID: ${videoId}`);
 
     let transcript = null;
     let detectedLanguage = 'en';
@@ -156,12 +188,12 @@ export async function fetchYoutubeTranscript(videoUrl) {
       try {
         if (lang.code) {
           console.log(`   Trying ${lang.name}...`);
-          transcript = await YoutubeTranscript.fetchTranscript(videoUrl, { lang: lang.code });
+          transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: lang.code });
           detectedLanguage = lang.code;
           isTranslated = lang.code !== 'en';
         } else {
           console.log('   Trying original...');
-          transcript = await YoutubeTranscript.fetchTranscript(videoUrl);
+          transcript = await YoutubeTranscript.fetchTranscript(videoId);
           detectedLanguage = 'unknown';
         }
 
