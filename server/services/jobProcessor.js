@@ -1,5 +1,5 @@
 import { supabase } from '../index.js';
-import { processVideo, extractGuideFromText, fetchYoutubeTranscript } from './videoProcessor.js';
+import { processVideo, extractGuideFromText, fetchTranscriptSupadata } from './videoProcessor.js';
 import fsPromises from 'fs/promises';
 import fs from 'fs';
 
@@ -34,11 +34,11 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
   console.log(`Starting background processing for job ${jobId}`);
 
   try {
-    // YouTube transcript check
+    // YouTube transcript check - using Supadata API
     const isYouTube = !isFile && (videoSource.includes('youtube.com') || videoSource.includes('youtu.be'));
     if (isYouTube) {
-      await updateJobStatus(jobId, {status: 'processing', started_at: new Date().toISOString(), progress: 10, current_step: 'Checking for captions...'});
-      const transcriptData = await fetchYoutubeTranscript(videoSource);
+      await updateJobStatus(jobId, {status: 'processing', started_at: new Date().toISOString(), progress: 10, current_step: 'Fetching transcript...'});
+      const transcriptData = await fetchTranscriptSupadata(videoSource);
       if (transcriptData) {
         await updateJobStatus(jobId, {progress: 40, current_step: 'Found captions!'});
         const guide = await extractGuideFromText(transcriptData.text, transcriptData.language);
@@ -64,12 +64,12 @@ export async function processVideoJob(jobId, videoSource, isFile, userId) {
           );
         }
 
-        await updateJobStatus(jobId, {status: 'completed', completed_at: new Date().toISOString(), progress: 100, current_step: 'Complete!', transcription: {text: transcriptData.text, language: transcriptData.language, source: 'youtube_transcript'}, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'youtube_transcript'}});
-        return {success: true, transcription: transcriptData, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'youtube_transcript'}};
+        await updateJobStatus(jobId, {status: 'completed', completed_at: new Date().toISOString(), progress: 100, current_step: 'Complete!', transcription: {text: transcriptData.text, language: transcriptData.language, source: 'supadata_api'}, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'supadata_transcript'}});
+        return {success: true, transcription: transcriptData, guide: guide, metadata: {processedAt: new Date().toISOString(), source: 'url', method: 'supadata_transcript'}};
       } else {
-        // No transcript available - fall back to download + Whisper
-        console.log('📹 No transcript found - falling back to video download...');
-        await updateJobStatus(jobId, {progress: 15, current_step: 'No captions found, downloading video...'});
+        // Supadata failed - fall back to download + Whisper
+        console.log('📹 Supadata transcript failed - falling back to video download...');
+        await updateJobStatus(jobId, {progress: 15, current_step: 'Transcript unavailable, downloading video...'});
       }
     }
 

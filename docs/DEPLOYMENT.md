@@ -54,6 +54,7 @@ Total cost: **$0** for hosting + pay-as-you-go for AI APIs
      SUPABASE_ANON_KEY=your_key
      OPENAI_API_KEY=your_key
      ANTHROPIC_API_KEY=your_key
+     SUPADATA_API_KEY=your_supadata_key
      MAX_FILE_SIZE=104857600
      TEMP_UPLOAD_DIR=./uploads
      ```

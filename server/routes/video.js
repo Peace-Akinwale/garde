@@ -2,6 +2,7 @@ import express from 'express';
 import { upload } from '../config/multer.js';
 import { processVideoJob, getJobStatus, getUserJobs } from '../services/jobProcessor.js';
 import { supabase } from '../index.js';
+import { normalizeVideoUrl } from '../utils/urlNormalizer.js';
 
 const router = express.Router();
 
@@ -24,12 +25,17 @@ router.post('/process-url', async (req, res) => {
 
     console.log(`📥 Processing request for URL: ${url}`);
 
-    // 🚀 CACHE CHECK: See if ANY user has already processed this exact URL
+    // Normalize URL for cache matching (removes query params, standardizes format)
+    const normalizedUrl = normalizeVideoUrl(url);
+    console.log(`🔗 Normalized URL: ${normalizedUrl}`);
+
+    // 🚀 CACHE CHECK: See if ANY user has already processed this URL (normalized)
     console.log('🔍 Checking cache for existing guide...');
     const { data: existingGuide, error: cacheCheckError } = await supabase
       .from('guides')
       .select('id, title, type, category, ingredients, steps, transcription, language, duration, servings, difficulty, tips, summary')
-      .eq('source_url', url)
+      .eq('source_url', normalizedUrl)
+      .eq('source_type', 'url') // Only match URL-based guides, not uploads or articles
       .limit(1)
       .maybeSingle();
 
@@ -43,6 +49,7 @@ router.post('/process-url', async (req, res) => {
       console.log(`📋 Cloning guide for user ${userId}...`);
 
       // Clone the guide for this user (instant result!)
+      // Store normalized URL for future cache hits
       const { data: clonedGuide, error: cloneError } = await supabase
         .from('guides')
         .insert({
@@ -53,7 +60,7 @@ router.post('/process-url', async (req, res) => {
           ingredients: existingGuide.ingredients,
           steps: existingGuide.steps,
           transcription: existingGuide.transcription,
-          source_url: url,
+          source_url: normalizedUrl, // Store normalized URL for cache consistency
           source_type: 'url',
           language: existingGuide.language,
           duration: existingGuide.duration,

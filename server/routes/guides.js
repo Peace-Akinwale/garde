@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabase } from '../index.js';
 import { trackActivity, ACTIVITY_TYPES } from '../services/analytics.js';
+import { normalizeVideoUrl } from '../utils/urlNormalizer.js';
 
 const router = express.Router();
 
@@ -123,6 +124,9 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Normalize source URL if provided (for cache consistency)
+    const normalizedSourceUrl = sourceUrl ? normalizeVideoUrl(sourceUrl) : null;
+
     const { data, error } = await supabase
       .from('guides')
       .insert([
@@ -140,7 +144,8 @@ router.post('/', async (req, res) => {
           tips: tips || [],
           summary,
           transcription,
-          source_url: sourceUrl,
+          source_url: normalizedSourceUrl, // Store normalized URL for cache matching
+          source_type: normalizedSourceUrl ? 'url' : null, // Set source_type if URL provided
         },
       ])
       .select()
